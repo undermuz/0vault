@@ -181,7 +181,7 @@ export class VaultArchive {
 
 	static fromJSON(j: {
 		zipSource: boolean;
-		entries: { path: string; data64: string }[];
+		entries: readonly { path: string; data64: string }[];
 	}): VaultArchive {
 		const a = new VaultArchive(j.zipSource);
 		a.entries.clear();

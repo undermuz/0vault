@@ -1,9 +1,9 @@
-import { use } from "react"
+import { useContext } from "react"
 
 import { DiContext } from "../di.context"
 
 export const useDiContainer = () => {
-    const di = use(DiContext)
+    const di = useContext(DiContext)
 
     if (!di) {
         throw new Error("useDi must be used within a DiProvider")
