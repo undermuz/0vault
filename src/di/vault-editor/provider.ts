@@ -202,7 +202,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		flushEditorToArchive(a, this.state.editorText, this.state.selectedPath);
 	}
 
-	async selectFile(path: string): Promise<void> {
+	selectFile(path: string): void {
 		const a = this.getArchive();
 		if (!a || !this.state.session) return;
 		this.flushEditor(a);
@@ -210,18 +210,18 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		this.state.treeSelection = { kind: "file", path };
 		this.state.editorText = textFromBytes(a.getBytes(path));
 		this.setArchiveInState(a);
-		await this.syncDirty();
-		await this.syncWindowTitle();
+		void this.syncDirty();
+		void this.syncWindowTitle();
 	}
 
 	selectDir(segments: string[]): void {
 		this.state.treeSelection = { kind: "dir", segments };
 	}
 
-	async setEditorText(text: string): Promise<void> {
+	setEditorText(text: string): void {
 		this.state.editorText = text;
-		await this.syncDirty();
-		await this.syncWindowTitle();
+		void this.syncDirty();
+		void this.syncWindowTitle();
 	}
 
 	private async syncDirty(): Promise<void> {
@@ -563,7 +563,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		const key = a.uniqueName(VaultArchive.normalizeEntryName(fullPath));
 		a.putBytes(key, new Uint8Array(0));
 		this.setArchiveInState(a);
-		await this.selectFile(key);
+		this.selectFile(key);
 	}
 
 	async newDir(): Promise<void> {
@@ -589,7 +589,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		const key = a.uniqueName(keeper);
 		a.putBytes(key, new Uint8Array(0));
 		this.setArchiveInState(a);
-		await this.selectFile(key);
+		this.selectFile(key);
 	}
 
 	async renameSelected(): Promise<void> {
@@ -625,7 +625,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				: cur && a.entriesView().has(cur)
 					? cur
 					: newPath;
-		await this.selectFile(prefer);
+		this.selectFile(prefer);
 	}
 
 	async deleteSelected(): Promise<void> {
@@ -654,7 +654,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		a.removePath(victim);
 		this.setArchiveInState(a);
 		const prefer = firstFilePath(buildArchiveTree(a));
-		if (prefer) await this.selectFile(prefer);
+		if (prefer) this.selectFile(prefer);
 		else {
 			this.state.selectedPath = null;
 			this.state.treeSelection = null;

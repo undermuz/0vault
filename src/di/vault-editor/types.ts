@@ -39,8 +39,8 @@ export interface IVaultEditorProvider {
 	pickAndOpen(): Promise<void>;
 	openPath(inputPath: string): Promise<void>;
 
-	setEditorText(text: string): Promise<void>;
-	selectFile(path: string): Promise<void>;
+	setEditorText(text: string): void;
+	selectFile(path: string): void;
 	selectDir(segments: string[]): void;
 
 	addFiles(): Promise<void>;
