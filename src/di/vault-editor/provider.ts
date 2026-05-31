@@ -120,7 +120,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (lower.endsWith(".zip")) {
 			await this.withIo("Чтение ZIP…", async () => {
 				const r = await api.readFileBase64({ path: inputPath });
-				if (!r.ok || !r.base64) {
+				if (!r.ok || typeof r.base64 !== "string") {
 					await api.showMessageBoxReq({
 						type: "error",
 						title: "Ошибка",
@@ -174,7 +174,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				return;
 			}
 			const r = await api.readFileBase64({ path: inputPath });
-			if (!r.ok || !r.base64) {
+			if (!r.ok || typeof r.base64 !== "string") {
 				await api.showMessageBoxReq({
 					type: "error",
 					title: "Ошибка",
@@ -534,7 +534,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		await this.withIo("Чтение файлов…", async () => {
 			for (const p of paths) {
 				const r = await api.readFileBase64({ path: p });
-				if (!r.ok || !r.base64) continue;
+				if (!r.ok || typeof r.base64 !== "string") continue;
 				const fn = fileNameOf(p) || "file.bin";
 				const name = a.uniqueName(fn);
 				a.putBytes(name, base64ToU8(r.base64));
