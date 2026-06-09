@@ -1,0 +1,20 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "ES2020",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "paths": {
+      "@vault/*": ["./src/vault/*"],
+      "@rpc/*": ["./src/rpc/*"],
+      "@libs/views": ["./libs/views/src/index.ts"],
+      "@libs/di": ["./libs/di/src/index.ts"],
+      "@libs/utils": ["./libs/utils/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", "../../package/dist"]
+}
