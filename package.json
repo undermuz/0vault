@@ -1,6 +1,6 @@
 {
 	"name": "0vault",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Encrypted .age vault editor with archive support — store passwords and secrets safely anywhere",
 	"scripts": {
 		"test": "bun test src/di/vault/archive src/di/bun/vault-age",
