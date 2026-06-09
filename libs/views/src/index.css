@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@source "../../../libs/views/src/**/*.{html,js,ts,jsx,tsx}";
+@source "../../../apps/electrobun-desktop/**/*.{html,js,ts,jsx,tsx}";

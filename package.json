@@ -3,13 +3,11 @@
   "version": "1.1.0",
   "description": "Encrypted .age vault editor with archive support — store passwords and secrets safely anywhere",
   "scripts": {
-    "test": "bun test src/di/vault/archive src/di/bun/vault-age",
-    "start": "vite build && electrobun dev",
-    "dev": "electrobun dev --watch",
-    "dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
-    "hmr": "vite --port 5173",
-    "build:canary": "vite build && electrobun build --env=canary",
-    "build:stable": "vite build && electrobun build --env=stable"
+    "test": "nx run electrobun-desktop:eb-test",
+    "dev": "nx run electrobun-desktop:eb-dev-watch",
+    "dev:hmr": "nx run electrobun-desktop:eb-dev-hmr",
+    "build:canary": "nx run electrobun-desktop:eb-build-canary",
+    "build:stable": "nx run electrobun-desktop:eb-build-stable"
   },
   "dependencies": {
     "@heroui/react": "^3.1.0",

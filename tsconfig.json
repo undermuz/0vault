@@ -13,6 +13,6 @@
     "strictPropertyInitialization": false,
     "noUncheckedSideEffectImports": false
   },
-  "include": ["src"],
+  "include": ["types"],
   "extends": "./tsconfig.base.json"
 }

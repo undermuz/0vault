@@ -4,6 +4,49 @@
   "sourceRoot": "apps/electrobun-desktop/src",
   "projectType": "application",
   "tags": [],
-  "// targets": "to see all targets run: nx show project electrobun-desktop --web",
-  "targets": {}
+  "targets": {
+    "eb-dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "electrobun dev",
+        "cwd": "apps/electrobun-desktop"
+      }
+    },
+    "eb-dev-watch": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "electrobun dev --watch",
+        "cwd": "apps/electrobun-desktop"
+      }
+    },
+    "eb-dev-hmr": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx --yes kill-port 5173 && concurrently -k -n vite,electrobun \"nx dev electrobun-desktop\" \"nx build electrobun-desktop && nx run electrobun-desktop:eb-dev\"",
+        "cwd": "."
+      }
+    },
+    "eb-build-canary": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "electrobun build --env=canary",
+        "cwd": "apps/electrobun-desktop"
+      }
+    },
+    "eb-build-stable": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "electrobun build --env=stable",
+        "cwd": "apps/electrobun-desktop"
+      }
+    },
+    "eb-test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bun test apps/electrobun-desktop/src/di/bun/vault-age libs/di/src/vault/archive"
+      }
+    }
+  }
 }
