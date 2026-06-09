@@ -1,4 +1,5 @@
 import { useEffect, useMemo, type KeyboardEvent } from "react";
+import { Surface } from "@heroui/react";
 import { useSnapshot } from "valtio";
 import { buildArchiveTree } from "@libs/utils/vault/tree";
 import { useDi } from "@libs/di/react/hooks/useDi";
@@ -97,7 +98,7 @@ export default function App() {
 	};
 
 	return (
-		<div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 flex flex-col">
+		<div className="h-screen overflow-hidden bg-background text-foreground flex flex-col">
 			<AppHeader
 				vault={vault}
 				hasSession={!!activeTab}
@@ -105,16 +106,7 @@ export default function App() {
 				ioLoading={snap.ioLoading}
 			/>
 
-			<VaultTabs
-				tabs={snap.tabs}
-				activeTabId={snap.activeTabId}
-				ioLoading={snap.ioLoading}
-				onActivate={(id) => void vault.activateTab(id)}
-				onClose={(id) => void vault.closeTab(id)}
-				onNew={() => void vault.newDocument()}
-			/>
-
-			<div className="flex-1 flex min-h-0">
+			<div className="app-frame">
 				<RecentFilesSidebar
 					entries={recentSnap.entries}
 					openPaths={openPaths}
@@ -123,25 +115,36 @@ export default function App() {
 					onRemove={(path) => void recentFiles.remove(path)}
 				/>
 
-				<div className="flex-1 flex flex-col min-w-0 min-h-0">
-					{!activeTab ? (
-						<WelcomePlaceholder />
-					) : (
-						<EditorWorkspace
-							tree={tree}
-							selectedPath={activeTab.selectedPath}
-							dirtyPaths={dirtySet}
-							ioLoading={snap.ioLoading}
-							editorTextDisabled={!activeTab.selectedPath || snap.ioLoading}
-							onTreeKeyDown={onTreeKeyDown}
-							onSelectFile={(p) => vault.selectFile(p)}
-							onSelectDir={(segs) => vault.selectDir(segs)}
-							onAddFiles={() => void vault.addFiles()}
-							onNewFile={() => void vault.newFile()}
-							onNewDir={() => void vault.newDir()}
-						/>
-					)}
-				</div>
+				<Surface variant="default" className="workspace-shell">
+					<VaultTabs
+						tabs={snap.tabs}
+						activeTabId={snap.activeTabId}
+						ioLoading={snap.ioLoading}
+						onActivate={(id) => void vault.activateTab(id)}
+						onClose={(id) => void vault.closeTab(id)}
+						onNew={() => void vault.newDocument()}
+					/>
+
+					<div className="flex-1 flex flex-col min-h-0 min-w-0">
+						{!activeTab ? (
+							<WelcomePlaceholder />
+						) : (
+							<EditorWorkspace
+								tree={tree}
+								selectedPath={activeTab.selectedPath}
+								dirtyPaths={dirtySet}
+								ioLoading={snap.ioLoading}
+								editorTextDisabled={!activeTab.selectedPath || snap.ioLoading}
+								onTreeKeyDown={onTreeKeyDown}
+								onSelectFile={(p) => vault.selectFile(p)}
+								onSelectDir={(segs) => vault.selectDir(segs)}
+								onAddFiles={() => void vault.addFiles()}
+								onNewFile={() => void vault.newFile()}
+								onNewDir={() => void vault.newDir()}
+							/>
+						)}
+					</div>
+				</Surface>
 			</div>
 
 			<DecryptModal

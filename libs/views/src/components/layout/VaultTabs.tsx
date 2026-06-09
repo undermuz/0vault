@@ -1,3 +1,5 @@
+import type { Key } from "@heroui/react";
+import { Button, Tabs } from "@heroui/react";
 import { I18nProvider } from "@libs/di/i18n/types";
 import { useT } from "@libs/di/react/hooks/useT";
 
@@ -19,62 +21,81 @@ export function VaultTabs(props: {
 	const { tabs, activeTabId, ioLoading, onActivate, onClose, onNew } = props;
 	const t = useT(I18nProvider);
 
+	if (tabs.length === 0) {
+		return (
+			<div className="shrink-0 flex items-center gap-2 border-b border-separator px-3 py-2 bg-surface-secondary">
+				<Button
+					size="sm"
+					variant="ghost"
+					isIconOnly
+					aria-label={t("tabs.new")}
+					title={t("tabs.new")}
+					isDisabled={ioLoading}
+					onPress={onNew}
+				>
+					+
+				</Button>
+			</div>
+		);
+	}
+
 	return (
-		<div
-			className="flex shrink-0 overflow-x-auto border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950/60"
-			role="tablist"
+		<Tabs
+			variant="secondary"
+			className="shrink-0 border-b border-separator bg-surface-secondary"
+			selectedKey={activeTabId ?? undefined}
+			onSelectionChange={(key: Key) => onActivate(String(key))}
 		>
-			{tabs.map((tab) => {
-				const active = activeTabId === tab.id;
-				const dirty =
-					tab.session.isNew ||
-					tab.dirtyPaths.length > 0;
-				return (
-					<div
-						key={tab.id}
-						role="tab"
-						aria-selected={active}
-						className={`group flex shrink-0 items-center gap-1 border-r border-zinc-200 px-2 py-1.5 text-sm dark:border-zinc-700 ${
-							active
-								? "bg-white text-emerald-900 dark:bg-zinc-900 dark:text-emerald-100"
-								: "bg-zinc-100/80 text-zinc-700 hover:bg-zinc-200/80 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:bg-zinc-700/80"
-						}`}
+			<Tabs.ListContainer>
+				<Tabs.List
+					aria-label={t("tabs.list")}
+					className="px-2 gap-0 min-h-10 items-center"
+				>
+					{tabs.map((tab, index) => {
+						const dirty =
+							tab.session.isNew ||
+							tab.dirtyPaths.length > 0;
+						return (
+							<Tabs.Tab
+								key={tab.id}
+								id={tab.id}
+								isDisabled={ioLoading}
+								className="group gap-1.5 pr-1 max-w-[15rem]"
+							>
+								{index > 0 ? <Tabs.Separator /> : null}
+								<span className="truncate text-sm">{tab.label}</span>
+								{dirty ? (
+									<span className="text-warning text-xs leading-none">•</span>
+								) : null}
+								<Button
+									size="sm"
+									variant="ghost"
+									isIconOnly
+									className="size-5 min-w-5 opacity-60 hover:opacity-100"
+									aria-label={t("tabs.close", { name: tab.label })}
+									isDisabled={ioLoading}
+									onPress={() => onClose(tab.id)}
+								>
+									×
+								</Button>
+								<Tabs.Indicator />
+							</Tabs.Tab>
+						);
+					})}
+					<Button
+						size="sm"
+						variant="ghost"
+						isIconOnly
+						className="ml-1 shrink-0"
+						aria-label={t("tabs.new")}
+						title={t("tabs.new")}
+						isDisabled={ioLoading}
+						onPress={onNew}
 					>
-						<button
-							type="button"
-							className="max-w-[14rem] truncate text-left"
-							title={tab.label}
-							disabled={ioLoading}
-							onClick={() => onActivate(tab.id)}
-						>
-							{tab.label}
-							{dirty ? " *" : ""}
-						</button>
-						<button
-							type="button"
-							className="rounded px-1 text-zinc-500 opacity-60 hover:bg-zinc-300/80 hover:opacity-100 disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-600/80 group-hover:opacity-100"
-							aria-label={t("tabs.close", { name: tab.label })}
-							disabled={ioLoading}
-							onClick={(e) => {
-								e.stopPropagation();
-								onClose(tab.id);
-							}}
-						>
-							×
-						</button>
-					</div>
-				);
-			})}
-			<button
-				type="button"
-				className="shrink-0 px-3 py-1.5 text-zinc-600 hover:bg-zinc-200/80 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-700/80"
-				aria-label={t("tabs.new")}
-				title={t("tabs.new")}
-				disabled={ioLoading}
-				onClick={onNew}
-			>
-				+
-			</button>
-		</div>
+						+
+					</Button>
+				</Tabs.List>
+			</Tabs.ListContainer>
+		</Tabs>
 	);
 }

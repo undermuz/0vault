@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from "react";
+import { Input, TextField } from "@heroui/react";
 import { useSnapshot } from "valtio";
 import { useDi } from "@libs/di/react/hooks/useDi";
 import {
@@ -10,22 +10,35 @@ export type ValtioVaultTextFieldKey = "decryptPass" | "pw1" | "pw2" | "promptInp
 
 type Props = {
 	field: ValtioVaultTextFieldKey;
-} & Omit<
-	InputHTMLAttributes<HTMLInputElement>,
-	"value" | "onChange" | "defaultValue"
->;
+	className?: string;
+	type?: "text" | "password" | "email" | "tel" | "url" | "search";
+	placeholder?: string;
+	autoFocus?: boolean;
+	isDisabled?: boolean;
+};
 
 /** Controlled input bound to `vault.state[field]` with sync snapshot (caret-safe). */
-export function ValtioVaultTextInput({ field, ...rest }: Props) {
+export function ValtioVaultTextInput({
+	field,
+	className,
+	type,
+	placeholder,
+	autoFocus,
+	isDisabled,
+}: Props) {
 	const vault = useDi<IVaultEditorProvider>(VaultEditorProviderToken);
 	const snap = useSnapshot(vault.state, { sync: true });
 	return (
-		<input
-			{...rest}
+		<TextField
+			className={className}
+			type={type}
 			value={snap[field]}
-			onChange={(e) => {
-				vault.state[field] = e.target.value;
+			onChange={(value: string) => {
+				vault.state[field] = value;
 			}}
-		/>
+			isDisabled={isDisabled}
+		>
+			<Input placeholder={placeholder} autoFocus={autoFocus} />
+		</TextField>
 	);
 }

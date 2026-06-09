@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
+import { reactAriaResolvePlugin } from '../../vite.react-aria-resolve.mts';
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
@@ -18,7 +19,11 @@ export default defineConfig(() => ({
     port: 5174,
     host: '127.0.0.1',
   },
+  optimizeDeps: {
+    include: ['use-sync-external-store/shim'],
+  },
   plugins: [
+    reactAriaResolvePlugin(),
     react(),
     tailwindcss(),
     nxViteTsPaths(),

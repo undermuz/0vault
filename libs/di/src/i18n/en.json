@@ -25,11 +25,17 @@
         "exportZipAge": "Export ZIP → .age"
     },
     "welcome": {
-        "hint": "Use + or New to create a container, or Open to add an .age, .zip, or plain file in a new tab."
+        "title": "No vault open",
+        "hint": "Create a new container or open an existing .age, .zip, or plain file."
     },
     "tabs": {
+        "list": "Open vaults",
         "new": "New tab",
         "close": "Close %{name}"
+    },
+    "editor": {
+        "noFile": "No file selected",
+        "pickFile": "Choose a file in the archive panel to edit its contents."
     },
     "recentFiles": {
         "title": "Recent",
@@ -37,6 +43,7 @@
         "remove": "Remove %{name} from history"
     },
     "archiveTree": {
+        "title": "Archive",
         "addFiles": "Add files",
         "newFile": "New file",
         "newDir": "New folder",

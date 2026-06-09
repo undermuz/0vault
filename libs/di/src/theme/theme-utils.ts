@@ -14,7 +14,10 @@ export function resolveDark(mode: ThemeMode): boolean {
 }
 
 export function applyThemeClass(dark: boolean): void {
-	document.documentElement.classList.toggle("dark", dark);
+	const root = document.documentElement;
+	root.classList.toggle("dark", dark);
+	root.classList.toggle("light", !dark);
+	root.setAttribute("data-theme", dark ? "dark" : "light");
 }
 
 /** Apply theme from localStorage before React boots (avoids flash). */

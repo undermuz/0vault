@@ -1,3 +1,4 @@
+import { Button, Description, Surface } from "@heroui/react";
 import type { RecentFileEntry } from "@libs/di/recent-files/types";
 import { I18nProvider } from "@libs/di/i18n/types";
 import { useT } from "@libs/di/react/hooks/useT";
@@ -24,15 +25,13 @@ export function RecentFilesSidebar(props: {
 	const t = useT(I18nProvider);
 
 	return (
-		<aside className="w-56 shrink-0 flex flex-col border-r border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950">
-			<div className="px-3 py-2 border-b border-zinc-200 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-				{t("recentFiles.title")}
-			</div>
+		<Surface variant="secondary" className="side-rail">
+			<div className="panel-section-title">{t("recentFiles.title")}</div>
 			<div className="flex-1 min-h-0 overflow-y-auto p-2">
 				{entries.length === 0 ? (
-					<p className="px-1 text-sm text-zinc-500 dark:text-zinc-400">
+					<Description className="px-2 py-4 text-sm leading-relaxed">
 						{t("recentFiles.empty")}
-					</p>
+					</Description>
 				) : (
 					<ul className="flex flex-col gap-0.5">
 						{entries.map((entry) => {
@@ -40,42 +39,42 @@ export function RecentFilesSidebar(props: {
 							const isOpen = openPaths.has(norm);
 							const hint = parentHint(entry.path);
 							return (
-								<li key={norm} className="group flex items-start gap-0.5">
-									<button
-										type="button"
-										className={`flex-1 min-w-0 rounded px-2 py-1.5 text-left ${
-											isOpen
-												? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100"
-												: "hover:bg-zinc-200/80 text-zinc-800 dark:hover:bg-zinc-800 dark:text-zinc-200"
+								<li key={norm} className="group relative">
+									<Button
+										variant="ghost"
+										className={`w-full h-auto flex-col items-start rounded-lg py-2.5 px-3 pr-9 ${
+											isOpen ? "list-item-selected" : ""
 										}`}
 										title={entry.path}
-										disabled={ioLoading}
-										onClick={() => onOpen(entry.path)}
+										isDisabled={ioLoading}
+										onPress={() => onOpen(entry.path)}
 									>
-										<div className="truncate text-sm font-medium">
+										<span className="truncate text-sm font-medium w-full text-left">
 											{entry.label}
-										</div>
+										</span>
 										{hint ? (
-											<div className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+											<span className="truncate text-xs text-muted w-full text-left">
 												{hint}
-											</div>
+											</span>
 										) : null}
-									</button>
-									<button
-										type="button"
-										className="shrink-0 rounded px-1 py-1.5 text-zinc-400 opacity-0 hover:bg-zinc-200/80 hover:text-zinc-700 group-hover:opacity-100 disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+									</Button>
+									<Button
+										size="sm"
+										variant="ghost"
+										isIconOnly
+										className="absolute right-1 top-1.5 size-6 min-w-6 opacity-0 group-hover:opacity-100"
 										aria-label={t("recentFiles.remove", { name: entry.label })}
-										disabled={ioLoading}
-										onClick={() => onRemove(entry.path)}
+										isDisabled={ioLoading}
+										onPress={() => onRemove(entry.path)}
 									>
 										×
-									</button>
+									</Button>
 								</li>
 							);
 						})}
 					</ul>
 				)}
 			</div>
-		</aside>
+		</Surface>
 	);
 }

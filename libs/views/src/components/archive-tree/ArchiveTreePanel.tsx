@@ -1,3 +1,5 @@
+import { FileArrowUp, FilePlus, FolderPlus } from "@gravity-ui/icons";
+import { Button, Description, Kbd, Surface } from "@heroui/react";
 import type { TreeBranch } from "@libs/utils/vault/tree";
 import type { KeyboardEvent } from "react";
 import { I18nProvider } from "@libs/di/i18n/types";
@@ -30,38 +32,52 @@ export function ArchiveTreePanel(props: {
 	} = props;
 	const t = useT(I18nProvider);
 	return (
-		<div
-			className="w-64 shrink-0 flex flex-col bg-zinc-100 p-2 gap-2 dark:bg-zinc-950"
+		<Surface
+			variant="secondary"
+			className="inspector-panel"
 			tabIndex={0}
 			onKeyDown={onTreeKeyDown}
 		>
-			<div className="flex flex-col gap-1">
-				<button
-					type="button"
-					disabled={ioLoading}
-					className="text-xs py-1 rounded bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50"
-					onClick={onAddFiles}
+			<div className="panel-section-title">{t("archiveTree.title")}</div>
+			<div className="panel-toolbar">
+				<Button
+					size="sm"
+					variant="secondary"
+					isIconOnly
+					aria-label={t("archiveTree.addFiles")}
+					title={t("archiveTree.addFiles")}
+					isDisabled={ioLoading}
+					onPress={onAddFiles}
 				>
-					{t("archiveTree.addFiles")}
-				</button>
-				<button
-					type="button"
-					disabled={ioLoading}
-					className="text-xs py-1 rounded bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50"
-					onClick={onNewFile}
+					<FileArrowUp className="size-4" />
+				</Button>
+				<Button
+					size="sm"
+					variant="tertiary"
+					isIconOnly
+					aria-label={t("archiveTree.newFile")}
+					title={t("archiveTree.newFile")}
+					isDisabled={ioLoading}
+					onPress={onNewFile}
 				>
-					{t("archiveTree.newFile")}
-				</button>
-				<button
-					type="button"
-					disabled={ioLoading}
-					className="text-xs py-1 rounded bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50"
-					onClick={onNewDir}
+					<FilePlus className="size-4" />
+				</Button>
+				<Button
+					size="sm"
+					variant="tertiary"
+					isIconOnly
+					aria-label={t("archiveTree.newDir")}
+					title={t("archiveTree.newDir")}
+					isDisabled={ioLoading}
+					onPress={onNewDir}
 				>
-					{t("archiveTree.newDir")}
-				</button>
+					<FolderPlus className="size-4" />
+				</Button>
 			</div>
-			<div className="flex-1 overflow-auto text-sm border border-zinc-300 rounded-md p-1 dark:border-zinc-700">
+			<Surface
+				variant="default"
+				className="flex-1 min-h-0 overflow-auto mx-3 my-3 rounded-lg border border-border p-2"
+			>
 				<ArchiveTreeRow
 					branches={tree}
 					level={0}
@@ -71,8 +87,27 @@ export function ArchiveTreePanel(props: {
 					onSelectDir={onSelectDir}
 					parentSegments={[]}
 				/>
-			</div>
-			<p className="text-[10px] text-zinc-500">{t("archiveTree.shortcuts")}</p>
-		</div>
+			</Surface>
+			<Surface variant="tertiary" className="mx-3 mb-3 rounded-lg px-3 py-2.5">
+				<Description className="text-[11px] leading-relaxed flex flex-wrap items-center gap-x-2 gap-y-1">
+					<span className="inline-flex items-center gap-1">
+						<Kbd><Kbd.Content>Del</Kbd.Content></Kbd>
+						delete
+					</span>
+					<span className="inline-flex items-center gap-1">
+						<Kbd><Kbd.Content>F2</Kbd.Content></Kbd>
+						rename
+					</span>
+					<span className="inline-flex items-center gap-1">
+						<Kbd><Kbd.Abbr keyValue="ctrl" /><Kbd.Content>S</Kbd.Content></Kbd>
+						save
+					</span>
+					<span className="inline-flex items-center gap-1">
+						<Kbd><Kbd.Abbr keyValue="ctrl" /><Kbd.Content>W</Kbd.Content></Kbd>
+						close
+					</span>
+				</Description>
+			</Surface>
+		</Surface>
 	);
 }

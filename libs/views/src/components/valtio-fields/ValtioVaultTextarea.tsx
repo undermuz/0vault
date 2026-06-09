@@ -1,3 +1,4 @@
+import { TextArea } from "@heroui/react";
 import type { TextareaHTMLAttributes } from "react";
 import { useSnapshot } from "valtio";
 import { useDi } from "@libs/di/react/hooks/useDi";
@@ -18,7 +19,7 @@ export function ValtioVaultTextarea(props: Props) {
 	const activeTab =
 		snap.tabs.find((tab) => tab.id === snap.activeTabId) ?? null;
 	return (
-		<textarea
+		<TextArea
 			{...props}
 			value={activeTab?.editorText ?? ""}
 			onChange={(e) => {
