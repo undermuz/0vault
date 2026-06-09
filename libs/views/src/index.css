@@ -4,3 +4,4 @@
 
 @source "../../../libs/views/src/**/*.{html,js,ts,jsx,tsx}";
 @source "../../../apps/electrobun-desktop/**/*.{html,js,ts,jsx,tsx}";
+@source "../../../apps/web-pwa/**/*.{html,js,ts,jsx,tsx}";

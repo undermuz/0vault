@@ -6,6 +6,8 @@
     "test": "nx run electrobun-desktop:eb-test",
     "dev": "nx run electrobun-desktop:eb-dev-watch",
     "dev:hmr": "nx run electrobun-desktop:eb-dev-hmr",
+    "dev:web": "nx dev web-pwa",
+    "build:web": "nx build web-pwa",
     "build:canary": "nx run electrobun-desktop:eb-build-canary",
     "build:stable": "nx run electrobun-desktop:eb-build-stable"
   },
@@ -62,6 +64,7 @@
     "typescript-eslint": "^8.40.0",
     "vite": "^8.0.16",
     "vite-plugin-dts": "~4.5.0",
+    "vite-plugin-pwa": "^1.3.0",
     "vitest": "~4.1.0"
   },
   "nx": {}
