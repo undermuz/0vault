@@ -9,27 +9,36 @@ export type TextPromptMode =
 	| "newDir"
 	| "rename";
 
+export type VaultTabSession = {
+	/** Serialized snapshot to keep Valtio state plain */
+	archiveJson: VaultArchiveJson;
+	vaultFilePath: string;
+	openedPath: string;
+	titleBase: string;
+	/** Never saved to disk (shows * in title; Save opens Save As). */
+	isNew: boolean;
+};
+
+export type VaultTab = {
+	id: string;
+	label: string;
+	session: VaultTabSession;
+	selectedPath: string | null;
+	treeSelection:
+		| { kind: "file"; path: string }
+		| { kind: "dir"; segments: string[] }
+		| null;
+	editorText: string;
+	dirtyPaths: string[];
+};
+
 export interface IVaultEditorProvider {
 	state: {
-		session: null | {
-			/** Serialized snapshot to keep Valtio state plain */
-			archiveJson: VaultArchiveJson;
-			vaultFilePath: string;
-			openedPath: string;
-			titleBase: string;
-			/** Never saved to disk (shows * in title; Save opens Save As). */
-			isNew: boolean;
-		};
-		selectedPath: string | null;
-		treeSelection:
-			| { kind: "file"; path: string }
-			| { kind: "dir"; segments: string[] }
-			| null;
-		editorText: string;
+		tabs: VaultTab[];
+		activeTabId: string | null;
 		/** Диск / расшифровка / шифрование — полноэкранный loader */
 		ioLoading: boolean;
 		ioLoadingMessage: string;
-		dirtyPaths: string[];
 		decryptModal: null | { path: string; hint?: string };
 		decryptPass: string;
 		pwModal:
@@ -58,6 +67,9 @@ export interface IVaultEditorProvider {
 	pickAndOpen(): Promise<void>;
 	openPath(inputPath: string): Promise<void>;
 
+	activateTab(tabId: string): Promise<void>;
+	closeTab(tabId: string): Promise<void>;
+
 	setEditorText(text: string): void;
 	selectFile(path: string): void;
 	selectDir(segments: string[]): void;
@@ -80,4 +92,3 @@ export interface IVaultEditorProvider {
 	textPromptSubmit(): Promise<void>;
 	textPromptCancel(): void;
 }
-

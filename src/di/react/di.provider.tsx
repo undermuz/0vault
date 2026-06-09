@@ -5,6 +5,10 @@ import { FC, PropsWithChildren, useEffect, useState } from "react"
 import { createDiContainer } from "../container"
 import { I18nProvider, type I18nService } from "../i18n/types"
 import { ThemeProvider, type ThemeService } from "../theme/types"
+import {
+    RecentFilesProviderToken,
+    type IRecentFilesProvider,
+} from "../recent-files/types"
 import { LocalStorageProvider, type ILocalStorage } from "../utils/local-storage/types"
 
 import { DiContext } from "./di.context"
@@ -25,6 +29,8 @@ export const DiProvider: FC<PropsWithChildren> = ({ children }) => {
                 await i18n.initialize()
                 const theme = di.get<ThemeService>(ThemeProvider)
                 await theme.initialize()
+                const recent = di.get<IRecentFilesProvider>(RecentFilesProviderToken)
+                await recent.initialize()
                 setReady(true)
             } catch (e) {
                 const message =

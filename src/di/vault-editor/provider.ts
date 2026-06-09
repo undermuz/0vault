@@ -25,7 +25,11 @@ import {
 import { api } from "../../mainview/electro";
 import { base64ToU8, u8ToBase64 } from "../../mainview/bytes";
 import { I18nProvider, type I18nService } from "../i18n/types";
-import type { IVaultEditorProvider, TextPromptMode } from "./types";
+import {
+	RecentFilesProviderToken,
+	type IRecentFilesProvider,
+} from "../recent-files/types";
+import type { IVaultEditorProvider, TextPromptMode, VaultTab } from "./types";
 
 function joinDirFile(dir: string, file: string): string {
 	const d = dir.replace(/\\/g, "/").replace(/\/+$/, "");
@@ -38,15 +42,21 @@ function fileNameOf(p: string): string {
 	return norm.split("/").pop() ?? norm;
 }
 
+function newTabId(): string {
+	return crypto.randomUUID();
+}
+
 @injectable()
 export class VaultEditorProvider implements IVaultEditorProvider {
 	constructor(
 		@inject(I18nProvider) private readonly i18n: I18nService,
 		@inject(VaultArchiveFactoryToken)
 		private readonly archives: IVaultArchiveFactory,
+		@inject(RecentFilesProviderToken)
+		private readonly recentFiles: IRecentFilesProvider,
 	) {}
 
-	private tracker = new ArchiveEntryEditTracker();
+	private trackers = new Map<string, ArchiveEntryEditTracker>();
 	private dirtyRun = 0;
 	private ioDepth = 0;
 	private unsavedFlag = false;
@@ -60,13 +70,10 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	state = proxy<IVaultEditorProvider["state"]>({
-		session: null,
-		selectedPath: null,
-		treeSelection: null,
-		editorText: "",
+		tabs: [],
+		activeTabId: null,
 		ioLoading: false,
 		ioLoadingMessage: "",
-		dirtyPaths: [],
 		decryptModal: null,
 		decryptPass: "",
 		pwModal: null,
@@ -76,6 +83,44 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		promptInput: "",
 	});
 
+	private getActiveTab(): VaultTab | null {
+		const id = this.state.activeTabId;
+		if (!id) return null;
+		return this.state.tabs.find((tab) => tab.id === id) ?? null;
+	}
+
+	private getTracker(tabId: string): ArchiveEntryEditTracker {
+		let tracker = this.trackers.get(tabId);
+		if (!tracker) {
+			tracker = new ArchiveEntryEditTracker();
+			this.trackers.set(tabId, tracker);
+		}
+		return tracker;
+	}
+
+	private tabLabel(
+		vaultFilePath: string,
+		titleSuffix: string,
+		isNew: boolean,
+	): string {
+		if (isNew) return this.t("document.untitled");
+		return fileNameOf(vaultFilePath) || titleSuffix;
+	}
+
+	private getTabArchive(tab: VaultTab): IVaultArchive {
+		return this.archives.fromJSON(tab.session.archiveJson);
+	}
+
+	private setTabArchiveInState(tab: VaultTab, a: IVaultArchive): void {
+		tab.session.archiveJson = a.toJSON();
+	}
+
+	private flushTabEditor(tab: VaultTab): void {
+		const a = this.getTabArchive(tab);
+		flushEditorToArchive(a, tab.editorText, tab.selectedPath);
+		this.setTabArchiveInState(tab, a);
+	}
+
 	private openTextPrompt(
 		mode: TextPromptMode,
 		titleKey: string,
@@ -84,17 +129,6 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	): void {
 		this.state.textPromptModal = { mode, titleKey, ...extra };
 		this.state.promptInput = defaultValue;
-	}
-
-	private getArchive(): IVaultArchive | null {
-		const s = this.state.session;
-		if (!s) return null;
-		return this.archives.fromJSON(s.archiveJson);
-	}
-
-	private setArchiveInState(a: IVaultArchive): void {
-		if (!this.state.session) return;
-		this.state.session.archiveJson = a.toJSON();
 	}
 
 	private async withIo<T>(message: string, fn: () => Promise<T>): Promise<T> {
@@ -114,24 +148,71 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		}
 	}
 
-	async init(): Promise<void> {
-		const { path } = await api.startupArgPath();
-		if (path && path.trim()) {
-			await this.openPath(path.trim(), { skipUnsavedCheck: true });
+	private tabHasUnsaved(tab: VaultTab): boolean {
+		const tracker = this.trackers.get(tab.id);
+		if (!tracker) return tab.session.isNew || tab.dirtyPaths.length > 0;
+		const a = this.getTabArchive(tab);
+		return (
+			tab.session.isNew ||
+			tab.dirtyPaths.length > 0 ||
+			tracker.hasDeletedPaths(a)
+		);
+	}
+
+	private updateGlobalUnsavedFlag(): void {
+		this.unsavedFlag = this.state.tabs.some((tab) => this.tabHasUnsaved(tab));
+		this.syncUnsavedToBun();
+	}
+
+	private syncUnsavedToBun(): void {
+		void api.setUnsavedFlag({ hasUnsaved: this.unsavedFlag });
+	}
+
+	private async syncDirtyForTab(tab: VaultTab): Promise<void> {
+		const run = ++this.dirtyRun;
+		const tracker = this.getTracker(tab.id);
+		const a = this.getTabArchive(tab);
+		const ed = new TextEncoder().encode(tab.editorText);
+		const next: string[] = [];
+		for (const p of a.entriesView().keys()) {
+			if (await tracker.isPathDirty(a, p, ed, tab.selectedPath)) {
+				next.push(p);
+			}
 		}
+		if (run !== this.dirtyRun) return;
+		tab.dirtyPaths = next;
+		this.updateGlobalUnsavedFlag();
 	}
 
-	hasUnsaved(): boolean {
-		return this.unsavedFlag;
+	private async flushAndSyncActiveTab(): Promise<void> {
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		this.flushTabEditor(tab);
+		await this.syncDirtyForTab(tab);
 	}
 
-	private async confirmDiscardUnsaved(): Promise<boolean> {
-		await this.syncDirty();
-		if (!this.unsavedFlag) return true;
+	private async syncWindowTitle(): Promise<void> {
+		const tab = this.getActiveTab();
+		if (!tab) {
+			this.updateGlobalUnsavedFlag();
+			await api.setWindowTitle({ title: this.t("app.name") });
+			return;
+		}
+		await this.syncDirtyForTab(tab);
+		const dirty = this.tabHasUnsaved(tab);
+		await api.setWindowTitle({
+			title: tab.session.titleBase + (dirty ? " *" : ""),
+		});
+	}
+
+	private async confirmDiscardTab(tab: VaultTab): Promise<boolean> {
+		this.flushTabEditor(tab);
+		await this.syncDirtyForTab(tab);
+		if (!this.tabHasUnsaved(tab)) return true;
 		const r = await api.showMessageBoxReq({
 			type: "question",
 			title: this.t("dialogs.unsaved.title"),
-			message: this.t("dialogs.unsaved.message"),
+			message: this.t("dialogs.unsaved.tabMessage", { name: tab.label }),
 			buttons: [this.t("dialogs.unsaved.discard"), this.t("common.cancel")],
 			defaultId: 1,
 			cancelId: 1,
@@ -139,27 +220,62 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		return r.response === 0;
 	}
 
-	private updateUnsavedFlag(): void {
-		const s = this.state.session;
-		if (!s) {
-			this.unsavedFlag = false;
-			return;
+	private async createTabFromArchive(
+		a: IVaultArchive,
+		vaultFilePath: string,
+		openedPath: string,
+		titleSuffix: string,
+		isNew = false,
+	): Promise<string> {
+		const id = newTabId();
+		const tracker = new ArchiveEntryEditTracker();
+		await tracker.captureBaseline(a);
+		this.trackers.set(id, tracker);
+
+		const first = firstFilePath(buildArchiveTree(a));
+		const tab: VaultTab = {
+			id,
+			label: this.tabLabel(vaultFilePath, titleSuffix, isNew),
+			session: {
+				archiveJson: a.toJSON(),
+				vaultFilePath,
+				openedPath,
+				titleBase: this.t("window.title", {
+					name: this.t("app.name"),
+					suffix: titleSuffix,
+				}),
+				isNew,
+			},
+			selectedPath: first,
+			treeSelection: first ? { kind: "file", path: first } : null,
+			editorText: textFromBytes(first ? a.getBytes(first) : null),
+			dirtyPaths: [],
+		};
+
+		await this.flushAndSyncActiveTab();
+		this.state.tabs = [...this.state.tabs, tab];
+		this.state.activeTabId = id;
+		if (openedPath.trim()) {
+			void this.recentFiles.recordOpen(openedPath);
 		}
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.unsavedFlag =
-			s.isNew ||
-			this.state.dirtyPaths.length > 0 ||
-			this.tracker.hasDeletedPaths(a);
+		await this.syncWindowTitle();
+		return id;
 	}
 
-	private syncUnsavedToBun(): void {
-		void api.setUnsavedFlag({ hasUnsaved: this.unsavedFlag });
+	async init(): Promise<void> {
+		const { path } = await api.startupArgPath();
+		if (path && path.trim()) {
+			await this.openPath(path.trim());
+		}
+	}
+
+	hasUnsaved(): boolean {
+		return this.unsavedFlag;
 	}
 
 	async newDocument(): Promise<void> {
-		if (!(await this.confirmDiscardUnsaved())) return;
 		const a = this.archives.empty();
-		await this.applyArchiveSession(
+		await this.createTabFromArchive(
 			a,
 			"",
 			"",
@@ -169,42 +285,11 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	async pickAndOpen(): Promise<void> {
-		if (!(await this.confirmDiscardUnsaved())) return;
 		const { paths } = await api.pickOpenFile();
-		if (paths[0]) await this.openPath(paths[0], { skipUnsavedCheck: true });
+		if (paths[0]) await this.openPath(paths[0]);
 	}
 
-	private async applyArchiveSession(
-		a: IVaultArchive,
-		vaultFilePath: string,
-		openedPath: string,
-		titleSuffix: string,
-		isNew = false,
-	): Promise<void> {
-		await this.tracker.captureBaseline(a);
-		this.state.session = {
-			archiveJson: a.toJSON(),
-			vaultFilePath,
-			openedPath,
-			titleBase: this.t("window.title", {
-				name: this.t("app.name"),
-				suffix: titleSuffix,
-			}),
-			isNew,
-		};
-		const first = firstFilePath(buildArchiveTree(a));
-		this.state.selectedPath = first;
-		this.state.treeSelection = first ? { kind: "file", path: first } : null;
-		this.state.editorText = textFromBytes(first ? a.getBytes(first) : null);
-		await this.syncDirty();
-		await this.syncWindowTitle();
-	}
-
-	async openPath(
-		inputPath: string,
-		opts: { skipUnsavedCheck?: boolean } = {},
-	): Promise<void> {
-		if (!opts.skipUnsavedCheck && !(await this.confirmDiscardUnsaved())) return;
+	async openPath(inputPath: string): Promise<void> {
 		const norm = inputPath.replace(/\\/g, "/");
 		const lower = norm.toLowerCase();
 		const fileName = fileNameOf(norm);
@@ -227,7 +312,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 					`${zipBase}.age`,
 				);
 				const a = this.archives.fromZipBytes(bytes, true);
-				await this.applyArchiveSession(
+				await this.createTabFromArchive(
 					a,
 					vaultSibling,
 					inputPath,
@@ -241,7 +326,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			const st = await api.fileStat({ path: inputPath });
 			if (st.ok && (!st.exists || !st.isFile || st.size === 0)) {
 				await this.withIo(this.t("io.preparingContainer"), async () => {
-					await this.applyArchiveSession(
+					await this.createTabFromArchive(
 						this.archives.empty(),
 						inputPath,
 						inputPath,
@@ -281,7 +366,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				`${plainBase}.age`,
 			);
 			const a = this.archives.fromPlainFile(fileName, bytes);
-			await this.applyArchiveSession(
+			await this.createTabFromArchive(
 				a,
 				vaultSibling,
 				inputPath,
@@ -290,66 +375,64 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		});
 	}
 
-	private flushEditor(a: IVaultArchive): void {
-		flushEditorToArchive(a, this.state.editorText, this.state.selectedPath);
+	async activateTab(tabId: string): Promise<void> {
+		if (tabId === this.state.activeTabId) return;
+		if (!this.state.tabs.some((tab) => tab.id === tabId)) return;
+		await this.flushAndSyncActiveTab();
+		this.state.activeTabId = tabId;
+		await this.syncWindowTitle();
+	}
+
+	async closeTab(tabId: string): Promise<void> {
+		const tab = this.state.tabs.find((t) => t.id === tabId);
+		if (!tab) return;
+
+		if (tabId === this.state.activeTabId) {
+			await this.flushAndSyncActiveTab();
+		} else {
+			this.flushTabEditor(tab);
+			await this.syncDirtyForTab(tab);
+		}
+
+		if (!(await this.confirmDiscardTab(tab))) return;
+
+		const idx = this.state.tabs.findIndex((t) => t.id === tabId);
+		this.trackers.delete(tabId);
+		const nextTabs = this.state.tabs.filter((t) => t.id !== tabId);
+		this.state.tabs = nextTabs;
+
+		if (this.state.activeTabId === tabId) {
+			const next = nextTabs[idx] ?? nextTabs[idx - 1] ?? null;
+			this.state.activeTabId = next?.id ?? null;
+		}
+
+		await this.syncWindowTitle();
 	}
 
 	selectFile(path: string): void {
-		const a = this.getArchive();
-		if (!a || !this.state.session) return;
-		this.flushEditor(a);
-		this.state.selectedPath = path;
-		this.state.treeSelection = { kind: "file", path };
-		this.state.editorText = textFromBytes(a.getBytes(path));
-		this.setArchiveInState(a);
-		void this.syncDirty();
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
+		tab.selectedPath = path;
+		tab.treeSelection = { kind: "file", path };
+		tab.editorText = textFromBytes(a.getBytes(path));
+		void this.syncDirtyForTab(tab);
 		void this.syncWindowTitle();
 	}
 
 	selectDir(segments: string[]): void {
-		this.state.treeSelection = { kind: "dir", segments };
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		tab.treeSelection = { kind: "dir", segments };
 	}
 
 	setEditorText(text: string): void {
-		this.state.editorText = text;
-		void this.syncDirty();
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		tab.editorText = text;
+		void this.syncDirtyForTab(tab);
 		void this.syncWindowTitle();
-	}
-
-	private async syncDirty(): Promise<void> {
-		const run = ++this.dirtyRun;
-		const s = this.state.session;
-		if (!s) {
-			this.state.dirtyPaths = [];
-			return;
-		}
-		const a = this.archives.fromJSON(s.archiveJson);
-		const ed = new TextEncoder().encode(this.state.editorText);
-		const next: string[] = [];
-		for (const p of a.entriesView().keys()) {
-			if (await this.tracker.isPathDirty(a, p, ed, this.state.selectedPath)) {
-				next.push(p);
-			}
-		}
-		if (run !== this.dirtyRun) return;
-		this.state.dirtyPaths = next;
-		this.updateUnsavedFlag();
-		this.syncUnsavedToBun();
-	}
-
-	private async syncWindowTitle(): Promise<void> {
-		const s = this.state.session;
-		if (!s) {
-			this.unsavedFlag = false;
-			this.syncUnsavedToBun();
-			await api.setWindowTitle({ title: this.t("app.name") });
-			return;
-		}
-		this.updateUnsavedFlag();
-		this.syncUnsavedToBun();
-		await api.setWindowTitle({
-			title: s.titleBase + (this.unsavedFlag ? " *" : ""),
-		});
 	}
 
 	async decryptSubmit(): Promise<void> {
@@ -393,7 +476,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		this.state.decryptPass = "";
 		await this.withIo(this.t("io.parsingContent"), async () => {
 			const a = this.archives.fromDecryptedPayload(plain);
-			await this.applyArchiveSession(a, path, path, fileNameOf(path));
+			await this.createTabFromArchive(a, path, path, fileNameOf(path));
 		});
 	}
 
@@ -403,10 +486,10 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	private async runSave(targetPath: string, passphrase: string): Promise<void> {
-		const s = this.state.session;
-		if (!s) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
 		const plain = a.toAgePlaintextBytes();
 		if (plain.length === 0) {
 			await api.showMessageBoxReq({
@@ -423,8 +506,9 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				plainBase64: u8ToBase64(plain),
 			});
 			if (r.ok) {
-				await this.tracker.captureBaseline(a);
-				this.state.session = {
+				const tracker = this.getTracker(tab.id);
+				await tracker.captureBaseline(a);
+				tab.session = {
 					archiveJson: a.toJSON(),
 					vaultFilePath: targetPath,
 					openedPath: targetPath,
@@ -434,12 +518,14 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 					}),
 					isNew: false,
 				};
+				tab.label = this.tabLabel(targetPath, fileNameOf(targetPath), false);
+				void this.recentFiles.recordOpen(targetPath);
 				await api.showMessageBoxReq({
 					type: "info",
 					title: this.t("common.done"),
 					message: this.t("dialogs.save.savedTo", { path: targetPath }),
 				});
-				await this.syncDirty();
+				await this.syncDirtyForTab(tab);
 				await this.syncWindowTitle();
 				return;
 			}
@@ -465,16 +551,17 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	async save(): Promise<void> {
-		const s = this.state.session;
-		if (!s || this.state.ioLoading) return;
+		const tab = this.getActiveTab();
+		if (!tab || this.state.ioLoading) return;
 
-		if (s.isNew) {
+		if (tab.session.isNew) {
 			await this.saveAs();
 			return;
 		}
 
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
+		const tracker = this.getTracker(tab.id);
 
 		const plain = a.toAgePlaintextBytes();
 		if (plain.length === 0) {
@@ -486,10 +573,10 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			return;
 		}
 
-		const dirty = await this.tracker.isAnythingDirty(
+		const dirty = await tracker.isAnythingDirty(
 			a,
-			new TextEncoder().encode(this.state.editorText),
-			this.state.selectedPath,
+			new TextEncoder().encode(tab.editorText),
+			tab.selectedPath,
 		);
 		if (!dirty) {
 			await api.showMessageBoxReq({
@@ -503,17 +590,17 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		this.state.pwModal = {
 			titleKey: "dialogs.save.overwritePassphrase",
 			mode: "save",
-			targetPath: s.vaultFilePath,
+			targetPath: tab.session.vaultFilePath,
 		};
 		this.state.pw1 = "";
 		this.state.pw2 = "";
 	}
 
 	async saveAs(): Promise<void> {
-		const s = this.state.session;
-		if (!s || this.state.ioLoading) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
+		const tab = this.getActiveTab();
+		if (!tab || this.state.ioLoading) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
 
 		const plain = a.toAgePlaintextBytes();
 		if (plain.length === 0) {
@@ -528,21 +615,21 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		const { paths } = await api.pickFolder();
 		if (!paths[0]) return;
 		const curName =
-			fileNameOf(s.vaultFilePath) ||
-			(s.isNew ? this.t("document.untitledFile") : "vault.age");
+			fileNameOf(tab.session.vaultFilePath) ||
+			(tab.session.isNew ? this.t("document.untitledFile") : "vault.age");
 		this.openTextPrompt("saveAs", "dialogs.prompts.ageFileName", curName, {
 			folderPath: paths[0],
 		});
 	}
 
 	async exportZipAge(): Promise<void> {
-		const s = this.state.session;
-		if (!s || this.state.ioLoading) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
+		const tab = this.getActiveTab();
+		if (!tab || this.state.ioLoading) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
 
 		const zipPlain = a.toZipBytes();
-		const suggest = defaultZipAgeExportSavePath(s.openedPath);
+		const suggest = defaultZipAgeExportSavePath(tab.session.openedPath);
 		const suggestName = fileNameOf(suggest) || "export.zip.age";
 		const { paths } = await api.pickFolder();
 		if (!paths[0]) return;
@@ -650,25 +737,25 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			return;
 		}
 
-		const s = this.state.session;
-		if (!s) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
 
 		if (mode === "newFile") {
-			const prefix = folderPrefixForTreeSelection(this.state.treeSelection);
+			const prefix = folderPrefixForTreeSelection(tab.treeSelection);
 			const trimmed = input.replace(/\\/g, "/");
 			const norm = this.archives.normalizeEntryName(trimmed);
 			const fullPath = norm.includes("/") ? norm : prefix + norm;
 			const key = a.uniqueName(this.archives.normalizeEntryName(fullPath));
 			a.putBytes(key, new Uint8Array(0));
-			this.setArchiveInState(a);
+			this.setTabArchiveInState(tab, a);
 			this.selectFile(key);
 			return;
 		}
 
 		if (mode === "newDir") {
-			const prefix = folderPrefixForTreeSelection(this.state.treeSelection);
+			const prefix = folderPrefixForTreeSelection(tab.treeSelection);
 			let trimmed = input.replace(/\\/g, "/");
 			let norm = this.archives.normalizeEntryName(trimmed);
 			while (norm.endsWith("/")) norm = norm.slice(0, -1);
@@ -679,7 +766,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			const keeper = this.archives.normalizeEntryName(`${dirPath}/.keep`);
 			const key = a.uniqueName(keeper);
 			a.putBytes(key, new Uint8Array(0));
-			this.setArchiveInState(a);
+			this.setTabArchiveInState(tab, a);
 			this.selectFile(key);
 			return;
 		}
@@ -705,8 +792,8 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				});
 				return;
 			}
-			this.setArchiveInState(a);
-			const cur = this.state.selectedPath;
+			this.setTabArchiveInState(tab, a);
+			const cur = tab.selectedPath;
 			const prefer =
 				fromPath === cur
 					? newPath
@@ -727,10 +814,10 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	async addFiles(): Promise<void> {
-		const s = this.state.session;
-		if (!s) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
 
 		const { paths } = await api.pickOpenMultiple();
 		if (!paths.length) return;
@@ -743,18 +830,18 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				const name = a.uniqueName(fn);
 				a.putBytes(name, base64ToU8(r.base64));
 			}
-			this.setArchiveInState(a);
+			this.setTabArchiveInState(tab, a);
 		});
-		await this.syncDirty();
+		await this.syncDirtyForTab(tab);
 		await this.syncWindowTitle();
 	}
 
 	async newFile(): Promise<void> {
-		const s = this.state.session;
-		if (!s) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
-		this.setArchiveInState(a);
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
+		this.setTabArchiveInState(tab, a);
 		this.openTextPrompt(
 			"newFile",
 			"dialogs.prompts.newFileName",
@@ -763,11 +850,11 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	async newDir(): Promise<void> {
-		const s = this.state.session;
-		if (!s) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
-		this.setArchiveInState(a);
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
+		this.setTabArchiveInState(tab, a);
 		this.openTextPrompt(
 			"newDir",
 			"dialogs.prompts.newDirName",
@@ -776,15 +863,16 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	async renameSelected(): Promise<void> {
-		if (this.state.selectedPath) await this.renameAt(this.state.selectedPath);
+		const tab = this.getActiveTab();
+		if (tab?.selectedPath) await this.renameAt(tab.selectedPath);
 	}
 
 	async renameAt(fromPath: string): Promise<void> {
-		const s = this.state.session;
-		if (!s) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
-		this.setArchiveInState(a);
+		const tab = this.getActiveTab();
+		if (!tab) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
+		this.setTabArchiveInState(tab, a);
 		const norm = fromPath.replace(/\\/g, "/");
 		const leaf = norm.includes("/") ? norm.slice(norm.lastIndexOf("/") + 1) : norm;
 		this.openTextPrompt("rename", "dialogs.prompts.rename", leaf, {
@@ -793,11 +881,11 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	}
 
 	async deleteSelected(): Promise<void> {
-		const s = this.state.session;
-		const victim = this.state.selectedPath;
-		if (!s || !victim) return;
-		const a = this.archives.fromJSON(s.archiveJson);
-		this.flushEditor(a);
+		const tab = this.getActiveTab();
+		const victim = tab?.selectedPath;
+		if (!tab || !victim) return;
+		const a = this.getTabArchive(tab);
+		this.flushTabEditor(tab);
 		if (a.entriesView().size <= 1) {
 			await api.showMessageBoxReq({
 				type: "info",
@@ -816,16 +904,15 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		});
 		if (conf.response !== 0) return;
 		a.removePath(victim);
-		this.setArchiveInState(a);
+		this.setTabArchiveInState(tab, a);
 		const prefer = firstFilePath(buildArchiveTree(a));
 		if (prefer) this.selectFile(prefer);
 		else {
-			this.state.selectedPath = null;
-			this.state.treeSelection = null;
-			this.state.editorText = "";
+			tab.selectedPath = null;
+			tab.treeSelection = null;
+			tab.editorText = "";
 		}
-		await this.syncDirty();
+		await this.syncDirtyForTab(tab);
 		await this.syncWindowTitle();
 	}
 }
-

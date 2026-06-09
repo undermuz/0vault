@@ -25,13 +25,22 @@
         "exportZipAge": "Export ZIP → .age"
     },
     "welcome": {
-        "hint": "Open an .age, .zip, or plain file using the Open button."
+        "hint": "Use + or New to create a container, or Open to add an .age, .zip, or plain file in a new tab."
+    },
+    "tabs": {
+        "new": "New tab",
+        "close": "Close %{name}"
+    },
+    "recentFiles": {
+        "title": "Recent",
+        "empty": "No recent files yet.",
+        "remove": "Remove %{name} from history"
     },
     "archiveTree": {
         "addFiles": "Add files",
         "newFile": "New file",
         "newDir": "New folder",
-        "shortcuts": "Del — delete, F2 — rename. Ctrl+S / Ctrl+Shift+S."
+        "shortcuts": "Del — delete, F2 — rename. Ctrl+S / Ctrl+Shift+S, Ctrl+W — close tab."
     },
     "decryptModal": {
         "title": "Decrypt",
@@ -95,6 +104,7 @@
         "unsaved": {
             "title": "Unsaved changes",
             "message": "Discard unsaved changes?",
+            "tabMessage": "Discard unsaved changes in \"%{name}\"?",
             "discard": "Discard",
             "quitTitle": "Quit",
             "quitMessage": "You have unsaved changes. Quit without saving?",
