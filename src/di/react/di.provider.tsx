@@ -4,6 +4,7 @@ import { FC, PropsWithChildren, useEffect, useState } from "react"
 
 import { createDiContainer } from "../container"
 import { I18nProvider, type I18nService } from "../i18n/types"
+import { ThemeProvider, type ThemeService } from "../theme/types"
 import { LocalStorageProvider, type ILocalStorage } from "../utils/local-storage/types"
 
 import { DiContext } from "./di.context"
@@ -22,6 +23,8 @@ export const DiProvider: FC<PropsWithChildren> = ({ children }) => {
                 await storage.initialize({ prefix: "0vault:" })
                 const i18n = di.get<I18nService>(I18nProvider)
                 await i18n.initialize()
+                const theme = di.get<ThemeService>(ThemeProvider)
+                await theme.initialize()
                 setReady(true)
             } catch (e) {
                 const message =

@@ -14,9 +14,9 @@ export function TextPromptModal(props: {
 	const t = useT(I18nProvider);
 	if (!visible) return null;
 	return (
-		<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+		<div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-50">
 			<form
-				className="bg-zinc-800 border border-zinc-600 rounded-lg p-4 w-96 shadow-xl"
+				className="bg-white border border-zinc-300 rounded-lg p-4 w-96 shadow-xl dark:bg-zinc-800 dark:border-zinc-600"
 				onSubmit={(e: FormEvent) => {
 					e.preventDefault();
 					onConfirm();
@@ -26,18 +26,18 @@ export function TextPromptModal(props: {
 				<ValtioVaultTextInput
 					field="promptInput"
 					autoFocus
-					className="w-full rounded bg-zinc-900 border border-zinc-600 px-2 py-1 mb-3"
+					className="w-full rounded bg-white border border-zinc-300 px-2 py-1 mb-3 dark:bg-zinc-900 dark:border-zinc-600"
 				/>
 				<div className="flex justify-end gap-2">
 					<button
 						type="button"
-						className="px-3 py-1 rounded bg-zinc-700"
+						className="px-3 py-1 rounded bg-zinc-200 dark:bg-zinc-700"
 						onClick={onCancel}
 						disabled={ioLoading}
 					>
 						{t("common.cancel")}
 					</button>
-					<button type="submit" className="px-3 py-1 rounded bg-emerald-700" disabled={ioLoading}>
+					<button type="submit" className="px-3 py-1 rounded bg-emerald-600 text-white dark:bg-emerald-700" disabled={ioLoading}>
 						{t("common.ok")}
 					</button>
 				</div>

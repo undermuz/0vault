@@ -31,7 +31,7 @@ export function ArchiveTreePanel(props: {
 	const t = useT(I18nProvider);
 	return (
 		<div
-			className="w-64 flex-shrink-0 flex flex-col bg-zinc-950 p-2 gap-2"
+			className="w-64 flex-shrink-0 flex flex-col bg-zinc-100 p-2 gap-2 dark:bg-zinc-950"
 			tabIndex={0}
 			onKeyDown={onTreeKeyDown}
 		>
@@ -39,7 +39,7 @@ export function ArchiveTreePanel(props: {
 				<button
 					type="button"
 					disabled={ioLoading}
-					className="text-xs py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
+					className="text-xs py-1 rounded bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50"
 					onClick={onAddFiles}
 				>
 					{t("archiveTree.addFiles")}
@@ -47,7 +47,7 @@ export function ArchiveTreePanel(props: {
 				<button
 					type="button"
 					disabled={ioLoading}
-					className="text-xs py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
+					className="text-xs py-1 rounded bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50"
 					onClick={onNewFile}
 				>
 					{t("archiveTree.newFile")}
@@ -55,13 +55,13 @@ export function ArchiveTreePanel(props: {
 				<button
 					type="button"
 					disabled={ioLoading}
-					className="text-xs py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
+					className="text-xs py-1 rounded bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50"
 					onClick={onNewDir}
 				>
 					{t("archiveTree.newDir")}
 				</button>
 			</div>
-			<div className="flex-1 overflow-auto text-sm border border-zinc-700 rounded-md p-1">
+			<div className="flex-1 overflow-auto text-sm border border-zinc-300 rounded-md p-1 dark:border-zinc-700">
 				<ArchiveTreeRow
 					branches={tree}
 					level={0}

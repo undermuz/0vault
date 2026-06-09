@@ -19,7 +19,7 @@ export function ArchiveTreeRow(props: {
 		parentSegments,
 	} = props;
 	return (
-		<ul className={level === 0 ? "tree-root" : "pl-3 border-l border-zinc-600/50"}>
+		<ul className={level === 0 ? "tree-root" : "pl-3 border-l border-zinc-300/80 dark:border-zinc-600/50"}>
 			{branches.map((br, i) => {
 				if (br.node.kind === "dir") {
 					const segs = [...parentSegments, br.node.name];
@@ -27,7 +27,7 @@ export function ArchiveTreeRow(props: {
 						<li key={`d-${segs.join("/")}-${i}`} className="py-0.5">
 							<button
 								type="button"
-								className="text-left w-full rounded px-1 hover:bg-zinc-700/80 text-zinc-300"
+								className="text-left w-full rounded px-1 hover:bg-zinc-200/80 text-zinc-700 dark:hover:bg-zinc-700/80 dark:text-zinc-300"
 								onClick={() => onSelectDir(segs)}
 							>
 								{br.node.name}/
@@ -54,8 +54,8 @@ export function ArchiveTreeRow(props: {
 							type="button"
 							className={`text-left w-full rounded px-1 font-mono text-sm ${
 								sel
-									? "bg-emerald-900/50 text-emerald-100"
-									: "hover:bg-zinc-700/80 text-zinc-200"
+									? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100"
+									: "hover:bg-zinc-200/80 text-zinc-800 dark:hover:bg-zinc-700/80 dark:text-zinc-200"
 							}`}
 							onClick={() => onSelectFile(path)}
 							onDoubleClick={() => onSelectFile(path)}

@@ -11,6 +11,12 @@
         "done": "Done",
         "loading": "Loading…"
     },
+    "theme": {
+        "label": "Theme",
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+    },
     "header": {
         "new": "New",
         "open": "Open…",

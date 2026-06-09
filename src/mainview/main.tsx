@@ -1,8 +1,11 @@
 import "reflect-metadata";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { bootstrapThemeFromStorage } from "../di/theme/theme-utils";
 import "./electro";
 import "./index.css";
+
+bootstrapThemeFromStorage();
 import App from "./App";
 
 import { DiProvider } from "../di/react/di.provider";
