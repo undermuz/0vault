@@ -1,12 +1,11 @@
 {
 	"compilerOptions": {
-		"baseUrl": ".",
 		"paths": {
-			"@vault/*": ["src/vault/*"],
-			"@rpc/*": ["src/rpc/*"]
+			"@vault/*": ["./src/vault/*"],
+			"@rpc/*": ["./src/rpc/*"]
 		},
 		"target": "ES2020",
-		"useDefineForClassFields": true,
+		"useDefineForClassFields": false,
 		"lib": ["ES2020", "DOM", "DOM.Iterable"],
 		"module": "ESNext",
 		"skipLibCheck": true,
@@ -22,7 +21,8 @@
 		"noFallthroughCasesInSwitch": true,
 		"emitDecoratorMetadata": true,
 		"experimentalDecorators": true,
-		"strictPropertyInitialization": false
+		"strictPropertyInitialization": false,
+		"noUncheckedSideEffectImports": false
 	},
 	"include": ["src"],
 	"exclude": ["node_modules", "dist", "build", "../../package/dist"]

@@ -10,7 +10,7 @@ export function IoLoadingOverlay(props: {
 	if (!visible) return null;
 	return (
 		<div
-			className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-100/70 backdrop-blur-[2px] dark:bg-zinc-950/70"
+			className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-100/70 backdrop-blur-[2px] dark:bg-zinc-950/70"
 			aria-busy="true"
 			aria-live="polite"
 		>

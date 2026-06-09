@@ -31,7 +31,7 @@ export function ArchiveTreePanel(props: {
 	const t = useT(I18nProvider);
 	return (
 		<div
-			className="w-64 flex-shrink-0 flex flex-col bg-zinc-100 p-2 gap-2 dark:bg-zinc-950"
+			className="w-64 shrink-0 flex flex-col bg-zinc-100 p-2 gap-2 dark:bg-zinc-950"
 			tabIndex={0}
 			onKeyDown={onTreeKeyDown}
 		>

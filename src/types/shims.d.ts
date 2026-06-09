@@ -1,3 +1,5 @@
+declare module "*.css" {}
+
 declare module "three" {
 	const x: unknown;
 	export = x;

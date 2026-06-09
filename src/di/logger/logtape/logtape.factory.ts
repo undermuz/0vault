@@ -5,7 +5,7 @@ import { ILogger } from "../../types/logger"
 
 export const logTapeFactory = (
     name: string,
-    settings?: ILoggerSettings,
+    _settings?: ILoggerSettings,
 ): ILogger => {
     const logger = getLogger(["di", name])
 

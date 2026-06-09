@@ -33,7 +33,7 @@ export function EditorWorkspace(props: {
 		<div className="flex-1 flex min-h-0">
 			<div className="flex-1 flex flex-col min-w-0 border-r border-zinc-200 dark:border-zinc-700">
 				<ValtioVaultTextarea
-					className="flex-1 w-full min-h-[320px] bg-white text-zinc-900 p-3 font-mono text-sm resize-none outline-none focus:ring-1 focus:ring-emerald-600/50 dark:bg-zinc-900 dark:text-zinc-100"
+					className="flex-1 w-full min-h-[320px] bg-white text-zinc-900 p-3 font-mono text-sm resize-none outline-hidden focus:ring-1 focus:ring-emerald-600/50 dark:bg-zinc-900 dark:text-zinc-100"
 					spellCheck={false}
 					disabled={editorTextDisabled}
 				/>
