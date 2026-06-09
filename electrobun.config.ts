@@ -24,4 +24,7 @@ export default {
 			bundleCEF: false,
 		},
 	},
+	release: {
+		baseUrl: "https://github.com/undermuz/0vault/releases/latest/download",
+	}
 } satisfies ElectrobunConfig;
