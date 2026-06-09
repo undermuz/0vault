@@ -1,4 +1,6 @@
 import type { FormEvent } from "react";
+import { I18nProvider } from "../../../di/i18n/types";
+import { useT } from "../../../di/react/hooks/useT";
 import { ValtioVaultTextInput } from "../valtio-fields";
 
 export function DecryptModal(props: {
@@ -9,6 +11,7 @@ export function DecryptModal(props: {
 	onCancel: () => void;
 }): JSX.Element | null {
 	const { visible, hint, ioLoading, onDecrypt, onCancel } = props;
+	const t = useT(I18nProvider);
 	if (!visible) return null;
 	return (
 		<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -19,8 +22,8 @@ export function DecryptModal(props: {
 					onDecrypt();
 				}}
 			>
-				<h2 className="font-semibold mb-2">Расшифровка</h2>
-				<p className="text-sm text-zinc-400 mb-2">Пароль контейнера:</p>
+				<h2 className="font-semibold mb-2">{t("decryptModal.title")}</h2>
+				<p className="text-sm text-zinc-400 mb-2">{t("decryptModal.passphraseLabel")}</p>
 				{hint && <p className="text-xs text-red-400 mb-2">{hint}</p>}
 				<ValtioVaultTextInput
 					field="decryptPass"
@@ -35,10 +38,10 @@ export function DecryptModal(props: {
 						onClick={onCancel}
 						disabled={ioLoading}
 					>
-						Отмена
+						{t("common.cancel")}
 					</button>
 					<button type="submit" className="px-3 py-1 rounded bg-emerald-700" disabled={ioLoading}>
-						OK
+						{t("common.ok")}
 					</button>
 				</div>
 			</form>

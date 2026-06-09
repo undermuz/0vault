@@ -1,4 +1,4 @@
-import type { VaultArchive } from "./archive";
+import type { IVaultArchive } from "../di/vault/archive";
 
 export type DirNode = { kind: "dir"; name: string };
 export type FileNode = { kind: "file"; path: string };
@@ -74,7 +74,7 @@ function addPathToTree(root: TreeBranch[], fullPath: string): void {
 }
 
 /** Build hierarchical tree from archive paths (sorted). */
-export function buildArchiveTree(archive: VaultArchive): TreeBranch[] {
+export function buildArchiveTree(archive: IVaultArchive): TreeBranch[] {
 	const root: TreeBranch[] = [];
 	for (const fullPath of archive.sortedPaths()) {
 		const dirOnly = directoryPathForKeeperEntry(fullPath);

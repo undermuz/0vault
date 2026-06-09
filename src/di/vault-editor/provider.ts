@@ -1,5 +1,11 @@
+import { inject, injectable } from "inversify";
 import { proxy } from "valtio";
-import { VaultArchive } from "@vault/archive";
+import { ArchiveError } from "../vault/archive";
+import {
+	VaultArchiveFactoryToken,
+	type IVaultArchive,
+	type IVaultArchiveFactory,
+} from "../vault/archive";
 import {
 	ArchiveEntryEditTracker,
 	flushEditorToArchive,
@@ -18,7 +24,8 @@ import {
 } from "@vault/paths";
 import { api } from "../../mainview/electro";
 import { base64ToU8, u8ToBase64 } from "../../mainview/bytes";
-import type { IVaultEditorProvider } from "./types";
+import { I18nProvider, type I18nService } from "../i18n/types";
+import type { IVaultEditorProvider, TextPromptMode } from "./types";
 
 function joinDirFile(dir: string, file: string): string {
 	const d = dir.replace(/\\/g, "/").replace(/\/+$/, "");
@@ -31,10 +38,26 @@ function fileNameOf(p: string): string {
 	return norm.split("/").pop() ?? norm;
 }
 
+@injectable()
 export class VaultEditorProvider implements IVaultEditorProvider {
+	constructor(
+		@inject(I18nProvider) private readonly i18n: I18nService,
+		@inject(VaultArchiveFactoryToken)
+		private readonly archives: IVaultArchiveFactory,
+	) {}
+
 	private tracker = new ArchiveEntryEditTracker();
 	private dirtyRun = 0;
 	private ioDepth = 0;
+	private unsavedFlag = false;
+
+	private t(key: string, options?: Record<string, unknown>): string {
+		return this.i18n.t(key, options);
+	}
+
+	private yesNoButtons(): [string, string] {
+		return [this.t("common.yes"), this.t("common.no")];
+	}
 
 	state = proxy<IVaultEditorProvider["state"]>({
 		session: null,
@@ -49,15 +72,27 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		pwModal: null,
 		pw1: "",
 		pw2: "",
+		textPromptModal: null,
+		promptInput: "",
 	});
 
-	private getArchive(): VaultArchive | null {
-		const s = this.state.session;
-		if (!s) return null;
-		return VaultArchive.fromJSON(s.archiveJson);
+	private openTextPrompt(
+		mode: TextPromptMode,
+		titleKey: string,
+		defaultValue: string,
+		extra: { folderPath?: string; renameFromPath?: string } = {},
+	): void {
+		this.state.textPromptModal = { mode, titleKey, ...extra };
+		this.state.promptInput = defaultValue;
 	}
 
-	private setArchiveInState(a: VaultArchive): void {
+	private getArchive(): IVaultArchive | null {
+		const s = this.state.session;
+		if (!s) return null;
+		return this.archives.fromJSON(s.archiveJson);
+	}
+
+	private setArchiveInState(a: IVaultArchive): void {
 		if (!this.state.session) return;
 		this.state.session.archiveJson = a.toJSON();
 	}
@@ -82,27 +117,80 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	async init(): Promise<void> {
 		const { path } = await api.startupArgPath();
 		if (path && path.trim()) {
-			await this.openPath(path.trim());
+			await this.openPath(path.trim(), { skipUnsavedCheck: true });
 		}
 	}
 
+	hasUnsaved(): boolean {
+		return this.unsavedFlag;
+	}
+
+	private async confirmDiscardUnsaved(): Promise<boolean> {
+		await this.syncDirty();
+		if (!this.unsavedFlag) return true;
+		const r = await api.showMessageBoxReq({
+			type: "question",
+			title: this.t("dialogs.unsaved.title"),
+			message: this.t("dialogs.unsaved.message"),
+			buttons: [this.t("dialogs.unsaved.discard"), this.t("common.cancel")],
+			defaultId: 1,
+			cancelId: 1,
+		});
+		return r.response === 0;
+	}
+
+	private updateUnsavedFlag(): void {
+		const s = this.state.session;
+		if (!s) {
+			this.unsavedFlag = false;
+			return;
+		}
+		const a = this.archives.fromJSON(s.archiveJson);
+		this.unsavedFlag =
+			s.isNew ||
+			this.state.dirtyPaths.length > 0 ||
+			this.tracker.hasDeletedPaths(a);
+	}
+
+	private syncUnsavedToBun(): void {
+		void api.setUnsavedFlag({ hasUnsaved: this.unsavedFlag });
+	}
+
+	async newDocument(): Promise<void> {
+		if (!(await this.confirmDiscardUnsaved())) return;
+		const a = this.archives.empty();
+		await this.applyArchiveSession(
+			a,
+			"",
+			"",
+			this.t("document.untitled"),
+			true,
+		);
+	}
+
 	async pickAndOpen(): Promise<void> {
+		if (!(await this.confirmDiscardUnsaved())) return;
 		const { paths } = await api.pickOpenFile();
-		if (paths[0]) await this.openPath(paths[0]);
+		if (paths[0]) await this.openPath(paths[0], { skipUnsavedCheck: true });
 	}
 
 	private async applyArchiveSession(
-		a: VaultArchive,
+		a: IVaultArchive,
 		vaultFilePath: string,
 		openedPath: string,
 		titleSuffix: string,
+		isNew = false,
 	): Promise<void> {
 		await this.tracker.captureBaseline(a);
 		this.state.session = {
 			archiveJson: a.toJSON(),
 			vaultFilePath,
 			openedPath,
-			titleBase: `0vault — ${titleSuffix}`,
+			titleBase: this.t("window.title", {
+				name: this.t("app.name"),
+				suffix: titleSuffix,
+			}),
+			isNew,
 		};
 		const first = firstFilePath(buildArchiveTree(a));
 		this.state.selectedPath = first;
@@ -112,19 +200,23 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		await this.syncWindowTitle();
 	}
 
-	async openPath(inputPath: string): Promise<void> {
+	async openPath(
+		inputPath: string,
+		opts: { skipUnsavedCheck?: boolean } = {},
+	): Promise<void> {
+		if (!opts.skipUnsavedCheck && !(await this.confirmDiscardUnsaved())) return;
 		const norm = inputPath.replace(/\\/g, "/");
 		const lower = norm.toLowerCase();
 		const fileName = fileNameOf(norm);
 
 		if (lower.endsWith(".zip")) {
-			await this.withIo("Чтение ZIP…", async () => {
+			await this.withIo(this.t("io.readingZip"), async () => {
 				const r = await api.readFileBase64({ path: inputPath });
 				if (!r.ok || typeof r.base64 !== "string") {
 					await api.showMessageBoxReq({
 						type: "error",
-						title: "Ошибка",
-						message: r.error ?? "Не удалось прочитать ZIP",
+						title: this.t("common.error"),
+						message: r.error ?? this.t("errors.readZipFailed"),
 					});
 					return;
 				}
@@ -134,7 +226,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 					parentDirectoryPrefixOfPath(norm) || ".",
 					`${zipBase}.age`,
 				);
-				const a = VaultArchive.fromZipBytes(bytes, true);
+				const a = this.archives.fromZipBytes(bytes, true);
 				await this.applyArchiveSession(
 					a,
 					vaultSibling,
@@ -148,9 +240,9 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (lower.endsWith(".age")) {
 			const st = await api.fileStat({ path: inputPath });
 			if (st.ok && (!st.exists || !st.isFile || st.size === 0)) {
-				await this.withIo("Подготовка контейнера…", async () => {
+				await this.withIo(this.t("io.preparingContainer"), async () => {
 					await this.applyArchiveSession(
-						VaultArchive.empty(),
+						this.archives.empty(),
 						inputPath,
 						inputPath,
 						fileName,
@@ -163,13 +255,13 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			return;
 		}
 
-		await this.withIo("Чтение файла…", async () => {
+		await this.withIo(this.t("io.readingFile"), async () => {
 			const st = await api.fileStat({ path: inputPath });
 			if (!st.ok || !st.exists || !st.isFile) {
 				await api.showMessageBoxReq({
 					type: "error",
-					title: "Ошибка",
-					message: `Файл не найден: ${inputPath}`,
+					title: this.t("common.error"),
+					message: this.t("errors.fileNotFound", { path: inputPath }),
 				});
 				return;
 			}
@@ -177,8 +269,8 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			if (!r.ok || typeof r.base64 !== "string") {
 				await api.showMessageBoxReq({
 					type: "error",
-					title: "Ошибка",
-					message: r.error ?? "Ошибка чтения",
+					title: this.t("common.error"),
+					message: r.error ?? this.t("errors.readFailed"),
 				});
 				return;
 			}
@@ -188,7 +280,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				parentDirectoryPrefixOfPath(norm) || ".",
 				`${plainBase}.age`,
 			);
-			const a = VaultArchive.fromPlainFile(fileName, bytes);
+			const a = this.archives.fromPlainFile(fileName, bytes);
 			await this.applyArchiveSession(
 				a,
 				vaultSibling,
@@ -198,7 +290,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		});
 	}
 
-	private flushEditor(a: VaultArchive): void {
+	private flushEditor(a: IVaultArchive): void {
 		flushEditorToArchive(a, this.state.editorText, this.state.selectedPath);
 	}
 
@@ -231,7 +323,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			this.state.dirtyPaths = [];
 			return;
 		}
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		const ed = new TextEncoder().encode(this.state.editorText);
 		const next: string[] = [];
 		for (const p of a.entriesView().keys()) {
@@ -241,18 +333,23 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		}
 		if (run !== this.dirtyRun) return;
 		this.state.dirtyPaths = next;
+		this.updateUnsavedFlag();
+		this.syncUnsavedToBun();
 	}
 
 	private async syncWindowTitle(): Promise<void> {
 		const s = this.state.session;
 		if (!s) {
-			await api.setWindowTitle({ title: "0vault" });
+			this.unsavedFlag = false;
+			this.syncUnsavedToBun();
+			await api.setWindowTitle({ title: this.t("app.name") });
 			return;
 		}
-		const a = VaultArchive.fromJSON(s.archiveJson);
-		const dirty =
-			this.state.dirtyPaths.length > 0 || this.tracker.hasDeletedPaths(a);
-		await api.setWindowTitle({ title: s.titleBase + (dirty ? " *" : "") });
+		this.updateUnsavedFlag();
+		this.syncUnsavedToBun();
+		await api.setWindowTitle({
+			title: s.titleBase + (this.unsavedFlag ? " *" : ""),
+		});
 	}
 
 	async decryptSubmit(): Promise<void> {
@@ -261,16 +358,15 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		const path = modal.path;
 		const st = await api.fileStat({ path });
 		const pass = this.state.decryptPass;
-		const r = await this.withIo("Расшифровка…", () =>
+		const r = await this.withIo(this.t("io.decrypting"), () =>
 			api.decryptAgeFile({ path, passphrase: pass }),
 		);
 		if (!r.ok || !r.plainBase64) {
 			const retry = await api.showMessageBoxReq({
 				type: "question",
-				title: "0vault",
-				message:
-					"Неверный пароль или контейнер не с паролем (scrypt). Попробовать ещё раз?",
-				buttons: ["Да", "Нет"],
+				title: this.t("app.name"),
+				message: this.t("dialogs.decryptRetry.message"),
+				buttons: this.yesNoButtons(),
 				defaultId: 0,
 				cancelId: 1,
 			});
@@ -286,9 +382,8 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (plain.length === 0 && st.ok && st.size > 0) {
 			await api.showMessageBoxReq({
 				type: "error",
-				title: "Ошибка",
-				message:
-					"Расшифровка дала пустой результат (неверный пароль или повреждённый контейнер).",
+				title: this.t("common.error"),
+				message: this.t("errors.decryptEmpty"),
 			});
 			this.state.decryptModal = null;
 			this.state.decryptPass = "";
@@ -296,8 +391,8 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		}
 		this.state.decryptModal = null;
 		this.state.decryptPass = "";
-		await this.withIo("Разбор содержимого…", async () => {
-			const a = VaultArchive.fromDecryptedPayload(plain);
+		await this.withIo(this.t("io.parsingContent"), async () => {
+			const a = this.archives.fromDecryptedPayload(plain);
 			await this.applyArchiveSession(a, path, path, fileNameOf(path));
 		});
 	}
@@ -310,18 +405,18 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	private async runSave(targetPath: string, passphrase: string): Promise<void> {
 		const s = this.state.session;
 		if (!s) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
 		const plain = a.toAgePlaintextBytes();
 		if (plain.length === 0) {
 			await api.showMessageBoxReq({
 				type: "warning",
-				title: "0vault",
-				message: "Данные пусты, сохранение отменено.",
+				title: this.t("app.name"),
+				message: this.t("dialogs.save.emptyData"),
 			});
 			return;
 		}
-		await this.withIo("Шифрование и запись…", async () => {
+		await this.withIo(this.t("io.encryptingAndWriting"), async () => {
 			const r = await api.encryptAgeFile({
 				targetPath,
 				passphrase,
@@ -333,12 +428,16 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 					archiveJson: a.toJSON(),
 					vaultFilePath: targetPath,
 					openedPath: targetPath,
-					titleBase: `VaultEditor — ${fileNameOf(targetPath)}`,
+					titleBase: this.t("window.title", {
+						name: this.t("app.name"),
+						suffix: fileNameOf(targetPath),
+					}),
+					isNew: false,
 				};
 				await api.showMessageBoxReq({
 					type: "info",
-					title: "Готово",
-					message: `Изменения сохранены в:\n${targetPath}`,
+					title: this.t("common.done"),
+					message: this.t("dialogs.save.savedTo", { path: targetPath }),
 				});
 				await this.syncDirty();
 				await this.syncWindowTitle();
@@ -347,15 +446,15 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 
 			const retry = await api.showMessageBoxReq({
 				type: "question",
-				title: "Сохранение",
-				message: `Ошибка: ${r.error ?? ""}\nПовторить ввод пароля?`,
-				buttons: ["Да", "Нет"],
+				title: this.t("dialogs.save.title"),
+				message: this.t("dialogs.save.errorRetry", { error: r.error ?? "" }),
+				buttons: this.yesNoButtons(),
 				defaultId: 0,
 				cancelId: 1,
 			});
 			if (retry.response === 0) {
 				this.state.pwModal = {
-					title: "Сохранение",
+					titleKey: "dialogs.save.title",
 					mode: "save",
 					targetPath,
 				};
@@ -368,15 +467,21 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	async save(): Promise<void> {
 		const s = this.state.session;
 		if (!s || this.state.ioLoading) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+
+		if (s.isNew) {
+			await this.saveAs();
+			return;
+		}
+
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
 
 		const plain = a.toAgePlaintextBytes();
 		if (plain.length === 0) {
 			await api.showMessageBoxReq({
 				type: "warning",
-				title: "0vault",
-				message: "Данные пусты, сохранение отменено.",
+				title: this.t("app.name"),
+				message: this.t("dialogs.save.emptyData"),
 			});
 			return;
 		}
@@ -389,14 +494,14 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (!dirty) {
 			await api.showMessageBoxReq({
 				type: "info",
-				title: "0vault",
-				message: "Изменений нет. Файл контейнера не перезаписывался.",
+				title: this.t("app.name"),
+				message: this.t("dialogs.save.noChanges"),
 			});
 			return;
 		}
 
 		this.state.pwModal = {
-			title: "Сохранение — пароль для перезаписи контейнера",
+			titleKey: "dialogs.save.overwritePassphrase",
 			mode: "save",
 			targetPath: s.vaultFilePath,
 		};
@@ -407,39 +512,33 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	async saveAs(): Promise<void> {
 		const s = this.state.session;
 		if (!s || this.state.ioLoading) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
 
 		const plain = a.toAgePlaintextBytes();
 		if (plain.length === 0) {
 			await api.showMessageBoxReq({
 				type: "warning",
-				title: "0vault",
-				message: "Данные пусты, сохранение отменено.",
+				title: this.t("app.name"),
+				message: this.t("dialogs.save.emptyData"),
 			});
 			return;
 		}
 
 		const { paths } = await api.pickFolder();
 		if (!paths[0]) return;
-		const curName = fileNameOf(s.vaultFilePath) || "vault.age";
-		const name = window.prompt("Имя файла (.age)", curName);
-		if (!name) return;
-		const targetPath = ensureAgeExtension(joinDirFile(paths[0], name.trim()));
-
-		this.state.pwModal = {
-			title: "Сохранить как — пароль для нового контейнера",
-			mode: "saveAs",
-			targetPath,
-		};
-		this.state.pw1 = "";
-		this.state.pw2 = "";
+		const curName =
+			fileNameOf(s.vaultFilePath) ||
+			(s.isNew ? this.t("document.untitledFile") : "vault.age");
+		this.openTextPrompt("saveAs", "dialogs.prompts.ageFileName", curName, {
+			folderPath: paths[0],
+		});
 	}
 
 	async exportZipAge(): Promise<void> {
 		const s = this.state.session;
 		if (!s || this.state.ioLoading) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
 
 		const zipPlain = a.toZipBytes();
@@ -447,22 +546,13 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		const suggestName = fileNameOf(suggest) || "export.zip.age";
 		const { paths } = await api.pickFolder();
 		if (!paths[0]) return;
-		const name = window.prompt("Имя .age файла", suggestName);
-		if (!name) return;
-		const exportDest = ensureAgeExtension(joinDirFile(paths[0], name.trim()));
-
-		// stash plaintext zip in editorText temporarily? no: just re-derive during pwSubmit
-		// Store desired target and mode; recompute zip in pwSubmit
-		this.state.pwModal = {
-			title: "Экспорт ZIP → age — пароль",
-			mode: "exportZipAge",
-			targetPath: exportDest,
-		};
-		this.state.pw1 = "";
-		this.state.pw2 = "";
-		// cache zipPlain as base64 in session? keep it simple: stash to session? not allowed.
-		// We'll store in editorText? unsafe. Keep private field.
 		this._pendingZipPlain = zipPlain;
+		this.openTextPrompt(
+			"exportZipAge",
+			"dialogs.prompts.ageExportFileName",
+			suggestName,
+			{ folderPath: paths[0] },
+		);
 	}
 
 	private _pendingZipPlain: Uint8Array | null = null;
@@ -473,8 +563,8 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (this.state.pw1 !== this.state.pw2) {
 			await api.showMessageBoxReq({
 				type: "warning",
-				title: modal.title,
-				message: "Пароли не совпадают.",
+				title: this.t(modal.titleKey),
+				message: this.t("errors.passwordMismatch"),
 			});
 			return;
 		}
@@ -489,7 +579,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			if (!this._pendingZipPlain) return;
 			const zipPlain = this._pendingZipPlain;
 			this._pendingZipPlain = null;
-			await this.withIo("Шифрование ZIP…", async () => {
+			await this.withIo(this.t("io.encryptingZip"), async () => {
 				const r = await api.encryptAgeFile({
 					targetPath: target,
 					passphrase: pass,
@@ -498,14 +588,14 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 				if (r.ok) {
 					await api.showMessageBoxReq({
 						type: "info",
-						title: "Готово",
-						message: `ZIP зашифрован и сохранён в:\n${target}`,
+						title: this.t("common.done"),
+						message: this.t("dialogs.save.zipSavedTo", { path: target }),
 					});
 				} else {
 					await api.showMessageBoxReq({
 						type: "error",
-						title: "Ошибка",
-						message: r.error ?? "Ошибка шифрования",
+						title: this.t("common.error"),
+						message: r.error ?? this.t("errors.encryptFailed"),
 					});
 				}
 			});
@@ -522,16 +612,130 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		this._pendingZipPlain = null;
 	}
 
+	async textPromptSubmit(): Promise<void> {
+		const modal = this.state.textPromptModal;
+		if (!modal) return;
+		const input = this.state.promptInput.trim();
+		if (!input) return;
+
+		const mode = modal.mode;
+		this.state.textPromptModal = null;
+		this.state.promptInput = "";
+
+		if (mode === "saveAs") {
+			if (!modal.folderPath) return;
+			const targetPath = ensureAgeExtension(
+				joinDirFile(modal.folderPath, input),
+			);
+			this.state.pwModal = {
+				titleKey: "dialogs.save.saveAsPassphrase",
+				mode: "saveAs",
+				targetPath,
+			};
+			this.state.pw1 = "";
+			this.state.pw2 = "";
+			return;
+		}
+
+		if (mode === "exportZipAge") {
+			if (!modal.folderPath) return;
+			const exportDest = ensureAgeExtension(joinDirFile(modal.folderPath, input));
+			this.state.pwModal = {
+				titleKey: "dialogs.save.exportZipPassphrase",
+				mode: "exportZipAge",
+				targetPath: exportDest,
+			};
+			this.state.pw1 = "";
+			this.state.pw2 = "";
+			return;
+		}
+
+		const s = this.state.session;
+		if (!s) return;
+		const a = this.archives.fromJSON(s.archiveJson);
+		this.flushEditor(a);
+
+		if (mode === "newFile") {
+			const prefix = folderPrefixForTreeSelection(this.state.treeSelection);
+			const trimmed = input.replace(/\\/g, "/");
+			const norm = this.archives.normalizeEntryName(trimmed);
+			const fullPath = norm.includes("/") ? norm : prefix + norm;
+			const key = a.uniqueName(this.archives.normalizeEntryName(fullPath));
+			a.putBytes(key, new Uint8Array(0));
+			this.setArchiveInState(a);
+			this.selectFile(key);
+			return;
+		}
+
+		if (mode === "newDir") {
+			const prefix = folderPrefixForTreeSelection(this.state.treeSelection);
+			let trimmed = input.replace(/\\/g, "/");
+			let norm = this.archives.normalizeEntryName(trimmed);
+			while (norm.endsWith("/")) norm = norm.slice(0, -1);
+			if (!norm) return;
+			const dirPath = this.archives.normalizeEntryName(
+				norm.includes("/") ? norm : prefix + norm,
+			);
+			const keeper = this.archives.normalizeEntryName(`${dirPath}/.keep`);
+			const key = a.uniqueName(keeper);
+			a.putBytes(key, new Uint8Array(0));
+			this.setArchiveInState(a);
+			this.selectFile(key);
+			return;
+		}
+
+		if (mode === "rename") {
+			const fromPath = modal.renameFromPath;
+			if (!fromPath) return;
+			const newPath = this.archives.resolveRenameTargetPath(fromPath, input);
+			if (!newPath || newPath === fromPath) return;
+			try {
+				a.renameEntry(fromPath, newPath);
+			} catch (e) {
+				const message =
+					e instanceof ArchiveError
+						? this.t(e.key, e.params)
+						: e instanceof Error
+							? e.message
+							: String(e);
+				await api.showMessageBoxReq({
+					type: "warning",
+					title: this.t("dialogs.rename.title"),
+					message,
+				});
+				return;
+			}
+			this.setArchiveInState(a);
+			const cur = this.state.selectedPath;
+			const prefer =
+				fromPath === cur
+					? newPath
+					: cur && a.entriesView().has(cur)
+						? cur
+						: newPath;
+			this.selectFile(prefer);
+		}
+	}
+
+	textPromptCancel(): void {
+		const wasExport = this.state.textPromptModal?.mode === "exportZipAge";
+		this.state.textPromptModal = null;
+		this.state.promptInput = "";
+		if (wasExport) {
+			this._pendingZipPlain = null;
+		}
+	}
+
 	async addFiles(): Promise<void> {
 		const s = this.state.session;
 		if (!s) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
 
 		const { paths } = await api.pickOpenMultiple();
 		if (!paths.length) return;
 
-		await this.withIo("Чтение файлов…", async () => {
+		await this.withIo(this.t("io.readingFiles"), async () => {
 			for (const p of paths) {
 				const r = await api.readFileBase64({ path: p });
 				if (!r.ok || typeof r.base64 !== "string") continue;
@@ -548,48 +752,27 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	async newFile(): Promise<void> {
 		const s = this.state.session;
 		if (!s) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
-		const prefix = folderPrefixForTreeSelection(this.state.treeSelection);
-		const input = window.prompt(
-			"Имя файла относительно выбранной папки (можно подпуть):",
-			"новый.txt",
-		);
-		if (!input) return;
-		const trimmed = input.trim().replace(/\\/g, "/");
-		if (!trimmed) return;
-		const norm = VaultArchive.normalizeEntryName(trimmed);
-		const fullPath = norm.includes("/") ? norm : prefix + norm;
-		const key = a.uniqueName(VaultArchive.normalizeEntryName(fullPath));
-		a.putBytes(key, new Uint8Array(0));
 		this.setArchiveInState(a);
-		this.selectFile(key);
+		this.openTextPrompt(
+			"newFile",
+			"dialogs.prompts.newFileName",
+			this.t("dialogs.prompts.newFileDefault"),
+		);
 	}
 
 	async newDir(): Promise<void> {
 		const s = this.state.session;
 		if (!s) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
-		const prefix = folderPrefixForTreeSelection(this.state.treeSelection);
-		const input = window.prompt(
-			"Имя каталога (вложенный путь допустим):",
-			"Новая папка",
-		);
-		if (!input) return;
-		let trimmed = input.trim().replace(/\\/g, "/");
-		if (!trimmed) return;
-		let norm = VaultArchive.normalizeEntryName(trimmed);
-		while (norm.endsWith("/")) norm = norm.slice(0, -1);
-		if (!norm) return;
-		const dirPath = VaultArchive.normalizeEntryName(
-			norm.includes("/") ? norm : prefix + norm,
-		);
-		const keeper = VaultArchive.normalizeEntryName(`${dirPath}/.keep`);
-		const key = a.uniqueName(keeper);
-		a.putBytes(key, new Uint8Array(0));
 		this.setArchiveInState(a);
-		this.selectFile(key);
+		this.openTextPrompt(
+			"newDir",
+			"dialogs.prompts.newDirName",
+			this.t("dialogs.prompts.newDirDefault"),
+		);
 	}
 
 	async renameSelected(): Promise<void> {
@@ -599,54 +782,35 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	async renameAt(fromPath: string): Promise<void> {
 		const s = this.state.session;
 		if (!s) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
+		this.setArchiveInState(a);
 		const norm = fromPath.replace(/\\/g, "/");
 		const leaf = norm.includes("/") ? norm.slice(norm.lastIndexOf("/") + 1) : norm;
-		const input = window.prompt("Новое имя или путь с «/» внутри архива:", leaf);
-		if (!input) return;
-		const newPath = VaultArchive.resolveRenameTargetPath(fromPath, input);
-		if (!newPath || newPath === fromPath) return;
-		try {
-			a.renameEntry(fromPath, newPath);
-		} catch (e) {
-			await api.showMessageBoxReq({
-				type: "warning",
-				title: "Переименование",
-				message: e instanceof Error ? e.message : String(e),
-			});
-			return;
-		}
-		this.setArchiveInState(a);
-		const cur = this.state.selectedPath;
-		const prefer =
-			fromPath === cur
-				? newPath
-				: cur && a.entriesView().has(cur)
-					? cur
-					: newPath;
-		this.selectFile(prefer);
+		this.openTextPrompt("rename", "dialogs.prompts.rename", leaf, {
+			renameFromPath: fromPath,
+		});
 	}
 
 	async deleteSelected(): Promise<void> {
 		const s = this.state.session;
 		const victim = this.state.selectedPath;
 		if (!s || !victim) return;
-		const a = VaultArchive.fromJSON(s.archiveJson);
+		const a = this.archives.fromJSON(s.archiveJson);
 		this.flushEditor(a);
 		if (a.entriesView().size <= 1) {
 			await api.showMessageBoxReq({
 				type: "info",
-				title: "Удаление",
-				message: "Нельзя удалить последний файл в архиве.",
+				title: this.t("dialogs.delete.title"),
+				message: this.t("dialogs.delete.lastFile"),
 			});
 			return;
 		}
 		const conf = await api.showMessageBoxReq({
 			type: "question",
-			title: "Удаление",
-			message: `Удалить файл «${victim}»?`,
-			buttons: ["Да", "Нет"],
+			title: this.t("dialogs.delete.title"),
+			message: this.t("dialogs.delete.confirm", { name: victim }),
+			buttons: this.yesNoButtons(),
 			defaultId: 1,
 			cancelId: 1,
 		});

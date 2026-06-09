@@ -38,6 +38,7 @@ export type VaultAppRPC = ElectrobunRPCSchema & {
 				response: { ok: boolean; error?: string };
 			};
 			setWindowTitle: { params: { title: string }; response: void };
+			setUnsavedFlag: { params: { hasUnsaved: boolean }; response: void };
 			showMessageBoxReq: {
 				params: MessageBoxReq;
 				response: { response: number };

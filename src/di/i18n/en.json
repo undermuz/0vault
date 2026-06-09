@@ -1,0 +1,112 @@
+{
+    "app": {
+        "name": "0vault"
+    },
+    "common": {
+        "cancel": "Cancel",
+        "ok": "OK",
+        "yes": "Yes",
+        "no": "No",
+        "error": "Error",
+        "done": "Done",
+        "loading": "Loading…"
+    },
+    "header": {
+        "new": "New",
+        "open": "Open…",
+        "save": "Save",
+        "saveAs": "Save As…",
+        "exportZipAge": "Export ZIP → .age"
+    },
+    "welcome": {
+        "hint": "Open an .age, .zip, or plain file using the Open button."
+    },
+    "archiveTree": {
+        "addFiles": "Add files",
+        "newFile": "New file",
+        "newDir": "New folder",
+        "shortcuts": "Del — delete, F2 — rename. Ctrl+S / Ctrl+Shift+S."
+    },
+    "decryptModal": {
+        "title": "Decrypt",
+        "passphraseLabel": "Container passphrase:"
+    },
+    "passwordModal": {
+        "passphrase": "Passphrase",
+        "passphraseConfirm": "Confirm passphrase"
+    },
+    "io": {
+        "readingZip": "Reading ZIP…",
+        "preparingContainer": "Preparing container…",
+        "readingFile": "Reading file…",
+        "decrypting": "Decrypting…",
+        "parsingContent": "Parsing contents…",
+        "encryptingAndWriting": "Encrypting and saving…",
+        "encryptingZip": "Encrypting ZIP…",
+        "readingFiles": "Reading files…"
+    },
+    "errors": {
+        "readZipFailed": "Failed to read ZIP",
+        "fileNotFound": "File not found: %{path}",
+        "readFailed": "Read error",
+        "decryptEmpty": "Decryption produced empty output (wrong passphrase or corrupted container).",
+        "encryptFailed": "Encryption error",
+        "passwordMismatch": "Passphrases do not match.",
+        "fileNotFoundShort": "File not found"
+    },
+    "dialogs": {
+        "decryptRetry": {
+            "message": "Wrong passphrase or container is not passphrase-protected (scrypt). Try again?"
+        },
+        "save": {
+            "title": "Save",
+            "errorRetry": "Error: %{error}\nRetry passphrase entry?",
+            "emptyData": "Data is empty; save cancelled.",
+            "noChanges": "No changes. Container file was not overwritten.",
+            "overwritePassphrase": "Save — passphrase to overwrite container",
+            "saveAsPassphrase": "Save As — passphrase for new container",
+            "exportZipPassphrase": "Export ZIP → .age — passphrase",
+            "savedTo": "Changes saved to:\n%{path}",
+            "zipSavedTo": "ZIP encrypted and saved to:\n%{path}"
+        },
+        "prompts": {
+            "ageFileName": "File name (.age)",
+            "ageExportFileName": ".age file name",
+            "newFileName": "File name relative to selected folder (subpaths allowed):",
+            "newFileDefault": "new.txt",
+            "newDirName": "Folder name (nested paths allowed):",
+            "newDirDefault": "New folder",
+            "rename": "New name or path with \"/\" inside the archive:"
+        },
+        "rename": {
+            "title": "Rename"
+        },
+        "delete": {
+            "title": "Delete",
+            "lastFile": "Cannot delete the last file in the archive.",
+            "confirm": "Delete file \"%{name}\"?"
+        },
+        "unsaved": {
+            "title": "Unsaved changes",
+            "message": "Discard unsaved changes?",
+            "discard": "Discard",
+            "quitTitle": "Quit",
+            "quitMessage": "You have unsaved changes. Quit without saving?",
+            "quit": "Quit without saving"
+        }
+    },
+    "window": {
+        "title": "%{name} — %{suffix}"
+    },
+    "document": {
+        "untitled": "Untitled",
+        "untitledFile": "Untitled.age"
+    },
+    "archive": {
+        "errors": {
+            "noEntry": "No entry: %{path}",
+            "emptyName": "Empty name",
+            "duplicate": "File already exists: %{path}"
+        }
+    }
+}

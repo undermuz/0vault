@@ -6,7 +6,7 @@ import {
 	type IVaultEditorProvider,
 } from "../../../di/vault-editor/types";
 
-export type ValtioVaultTextFieldKey = "decryptPass" | "pw1" | "pw2";
+export type ValtioVaultTextFieldKey = "decryptPass" | "pw1" | "pw2" | "promptInput";
 
 type Props = {
 	field: ValtioVaultTextFieldKey;

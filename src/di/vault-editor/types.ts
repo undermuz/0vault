@@ -1,16 +1,24 @@
+import type { VaultArchiveJson } from "../vault/archive";
+
 export const VaultEditorProviderToken = Symbol.for("VaultEditorProvider");
+
+export type TextPromptMode =
+	| "saveAs"
+	| "exportZipAge"
+	| "newFile"
+	| "newDir"
+	| "rename";
 
 export interface IVaultEditorProvider {
 	state: {
 		session: null | {
 			/** Serialized snapshot to keep Valtio state plain */
-			archiveJson: {
-				zipSource: boolean;
-				entries: { path: string; data64: string }[];
-			};
+			archiveJson: VaultArchiveJson;
 			vaultFilePath: string;
 			openedPath: string;
 			titleBase: string;
+			/** Never saved to disk (shows * in title; Save opens Save As). */
+			isNew: boolean;
 		};
 		selectedPath: string | null;
 		treeSelection:
@@ -27,15 +35,26 @@ export interface IVaultEditorProvider {
 		pwModal:
 			| null
 			| {
-					title: string;
+					titleKey: string;
 					mode: "save" | "saveAs" | "exportZipAge";
 					targetPath: string;
 			  };
 		pw1: string;
 		pw2: string;
+		textPromptModal:
+			| null
+			| {
+					mode: TextPromptMode;
+					titleKey: string;
+					folderPath?: string;
+					renameFromPath?: string;
+			  };
+		promptInput: string;
 	};
 
 	init(): Promise<void>;
+	hasUnsaved(): boolean;
+	newDocument(): Promise<void>;
 	pickAndOpen(): Promise<void>;
 	openPath(inputPath: string): Promise<void>;
 
@@ -58,5 +77,7 @@ export interface IVaultEditorProvider {
 	decryptCancel(): void;
 	pwSubmit(): Promise<void>;
 	pwCancel(): void;
+	textPromptSubmit(): Promise<void>;
+	textPromptCancel(): void;
 }
 

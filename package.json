@@ -3,7 +3,7 @@
 	"version": "1.0.0",
 	"description": "Encrypted .age vault editor with archive support — store passwords and secrets safely anywhere",
 	"scripts": {
-		"test": "bun test src/vault src/bun/vaultAge.test.ts",
+		"test": "bun test src/di/vault/archive src/di/bun/vault-age",
 		"start": "vite build && electrobun dev",
 		"dev": "electrobun dev --watch",
 		"dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
@@ -16,10 +16,12 @@
 		"electrobun": "1.16.0",
 		"fflate": "^0.8.2",
 		"inversify": "^7.11.0",
-		"react": "^18.3.1",
-		"react-dom": "^18.3.1",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
 		"reflect-metadata": "^0.2.2",
-		"valtio": "^2.3.1"
+		"valtio": "^2.1.5",
+		"i18n-js": "^4.5.1",
+		"@logtape/logtape": "^2.0.4"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",

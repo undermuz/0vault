@@ -1,8 +1,12 @@
+import { I18nProvider } from "../../../di/i18n/types";
+import { useT } from "../../../di/react/hooks/useT";
+
 export function IoLoadingOverlay(props: {
 	visible: boolean;
 	message: string;
 }): JSX.Element | null {
 	const { visible, message } = props;
+	const t = useT(I18nProvider);
 	if (!visible) return null;
 	return (
 		<div
@@ -16,7 +20,7 @@ export function IoLoadingOverlay(props: {
 					aria-hidden
 				/>
 				<p className="max-w-sm text-center text-sm text-zinc-200">
-					{message || "Загрузка…"}
+					{message || t("common.loading")}
 				</p>
 			</div>
 		</div>

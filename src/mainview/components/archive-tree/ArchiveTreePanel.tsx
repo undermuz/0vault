@@ -1,5 +1,7 @@
 import type { TreeBranch } from "@vault/tree";
 import type { KeyboardEvent } from "react";
+import { I18nProvider } from "../../../di/i18n/types";
+import { useT } from "../../../di/react/hooks/useT";
 import { ArchiveTreeRow } from "./ArchiveTreeRow";
 
 export function ArchiveTreePanel(props: {
@@ -26,6 +28,7 @@ export function ArchiveTreePanel(props: {
 		onNewFile,
 		onNewDir,
 	} = props;
+	const t = useT(I18nProvider);
 	return (
 		<div
 			className="w-64 flex-shrink-0 flex flex-col bg-zinc-950 p-2 gap-2"
@@ -39,7 +42,7 @@ export function ArchiveTreePanel(props: {
 					className="text-xs py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
 					onClick={onAddFiles}
 				>
-					Добавить файлы
+					{t("archiveTree.addFiles")}
 				</button>
 				<button
 					type="button"
@@ -47,7 +50,7 @@ export function ArchiveTreePanel(props: {
 					className="text-xs py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
 					onClick={onNewFile}
 				>
-					Создать файл
+					{t("archiveTree.newFile")}
 				</button>
 				<button
 					type="button"
@@ -55,7 +58,7 @@ export function ArchiveTreePanel(props: {
 					className="text-xs py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
 					onClick={onNewDir}
 				>
-					Создать каталог
+					{t("archiveTree.newDir")}
 				</button>
 			</div>
 			<div className="flex-1 overflow-auto text-sm border border-zinc-700 rounded-md p-1">
@@ -69,9 +72,7 @@ export function ArchiveTreePanel(props: {
 					parentSegments={[]}
 				/>
 			</div>
-			<p className="text-[10px] text-zinc-500">
-				Del — удалить, F2 — переименовать. Ctrl+S / Ctrl+Shift+S.
-			</p>
+			<p className="text-[10px] text-zinc-500">{t("archiveTree.shortcuts")}</p>
 		</div>
 	);
 }

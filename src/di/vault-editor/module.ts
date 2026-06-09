@@ -5,7 +5,7 @@ import { VaultEditorProvider } from "./provider";
 export const VaultEditorModule = new ContainerModule((ctx) => {
 	ctx
 		.bind<IVaultEditorProvider>(VaultEditorProviderToken)
-		.toDynamicValue(() => new VaultEditorProvider())
+		.to(VaultEditorProvider)
 		.inSingletonScope();
 });
 

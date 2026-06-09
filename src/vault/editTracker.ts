@@ -1,4 +1,4 @@
-import type { VaultArchive } from "./archive";
+import type { IVaultArchive } from "../di/vault/archive";
 
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
 	const copy = new Uint8Array(data.length);
@@ -18,7 +18,7 @@ export class ArchiveEntryEditTracker {
 	private baselineHashes = new Map<string, Uint8Array>();
 	private baselinePaths = new Set<string>();
 
-	async captureBaseline(archive: VaultArchive): Promise<void> {
+	async captureBaseline(archive: IVaultArchive): Promise<void> {
 		this.baselineHashes.clear();
 		this.baselinePaths.clear();
 		for (const path of archive.entriesView().keys()) {
@@ -29,7 +29,7 @@ export class ArchiveEntryEditTracker {
 		}
 	}
 
-	hasDeletedPaths(archive: VaultArchive): boolean {
+	hasDeletedPaths(archive: IVaultArchive): boolean {
 		for (const p of this.baselinePaths) {
 			if (!archive.entriesView().has(p)) return true;
 		}
@@ -37,7 +37,7 @@ export class ArchiveEntryEditTracker {
 	}
 
 	async isPathDirty(
-		archive: VaultArchive,
+		archive: IVaultArchive,
 		path: string | null,
 		editorTextUtf8: Uint8Array,
 		selectedPath: string | null,
@@ -65,7 +65,7 @@ export class ArchiveEntryEditTracker {
 	}
 
 	async isAnythingDirty(
-		archive: VaultArchive,
+		archive: IVaultArchive,
 		editorTextUtf8: Uint8Array,
 		selectedPath: string | null,
 	): Promise<boolean> {
@@ -85,7 +85,7 @@ export function textFromBytes(b: Uint8Array | null): string {
 }
 
 export function flushEditorToArchive(
-	archive: VaultArchive,
+	archive: IVaultArchive,
 	text: string,
 	path: string | null,
 ): void {

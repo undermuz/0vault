@@ -1,14 +1,17 @@
 import type { FormEvent } from "react";
+import { I18nProvider } from "../../../di/i18n/types";
+import { useT } from "../../../di/react/hooks/useT";
 import { ValtioVaultTextInput } from "../valtio-fields";
 
 export function PasswordModal(props: {
 	visible: boolean;
-	title: string;
+	titleKey: string;
 	ioLoading: boolean;
 	onConfirm: () => void;
 	onCancel: () => void;
 }): JSX.Element | null {
-	const { visible, title, ioLoading, onConfirm, onCancel } = props;
+	const { visible, titleKey, ioLoading, onConfirm, onCancel } = props;
+	const t = useT(I18nProvider);
 	if (!visible) return null;
 	return (
 		<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -19,18 +22,18 @@ export function PasswordModal(props: {
 					onConfirm();
 				}}
 			>
-				<h2 className="font-semibold mb-2 text-sm">{title}</h2>
+				<h2 className="font-semibold mb-2 text-sm">{t(titleKey)}</h2>
 				<ValtioVaultTextInput
 					field="pw1"
 					type="password"
-					placeholder="Пароль"
+					placeholder={t("passwordModal.passphrase")}
 					autoFocus
 					className="w-full rounded bg-zinc-900 border border-zinc-600 px-2 py-1 mb-2"
 				/>
 				<ValtioVaultTextInput
 					field="pw2"
 					type="password"
-					placeholder="Повтор пароля"
+					placeholder={t("passwordModal.passphraseConfirm")}
 					className="w-full rounded bg-zinc-900 border border-zinc-600 px-2 py-1 mb-3"
 				/>
 				<div className="flex justify-end gap-2">
@@ -40,10 +43,10 @@ export function PasswordModal(props: {
 						onClick={onCancel}
 						disabled={ioLoading}
 					>
-						Отмена
+						{t("common.cancel")}
 					</button>
 					<button type="submit" className="px-3 py-1 rounded bg-emerald-700" disabled={ioLoading}>
-						OK
+						{t("common.ok")}
 					</button>
 				</div>
 			</form>
