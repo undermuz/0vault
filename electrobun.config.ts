@@ -2,8 +2,8 @@ import type { ElectrobunConfig } from "electrobun";
 
 export default {
 	app: {
-		name: "VaultEditor",
-		identifier: "dev.undermuz.vaulteditor",
+		name: "0vault",
+		identifier: "undermuz.0vault",
 		version: "0.0.1",
 	},
 	build: {

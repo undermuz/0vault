@@ -102,7 +102,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 			archiveJson: a.toJSON(),
 			vaultFilePath,
 			openedPath,
-			titleBase: `VaultEditor — ${titleSuffix}`,
+			titleBase: `0vault — ${titleSuffix}`,
 		};
 		const first = firstFilePath(buildArchiveTree(a));
 		this.state.selectedPath = first;
@@ -246,7 +246,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 	private async syncWindowTitle(): Promise<void> {
 		const s = this.state.session;
 		if (!s) {
-			await api.setWindowTitle({ title: "VaultEditor" });
+			await api.setWindowTitle({ title: "0vault" });
 			return;
 		}
 		const a = VaultArchive.fromJSON(s.archiveJson);
@@ -267,7 +267,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (!r.ok || !r.plainBase64) {
 			const retry = await api.showMessageBoxReq({
 				type: "question",
-				title: "VaultEditor",
+				title: "0vault",
 				message:
 					"Неверный пароль или контейнер не с паролем (scrypt). Попробовать ещё раз?",
 				buttons: ["Да", "Нет"],
@@ -316,7 +316,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (plain.length === 0) {
 			await api.showMessageBoxReq({
 				type: "warning",
-				title: "VaultEditor",
+				title: "0vault",
 				message: "Данные пусты, сохранение отменено.",
 			});
 			return;
@@ -375,7 +375,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (plain.length === 0) {
 			await api.showMessageBoxReq({
 				type: "warning",
-				title: "VaultEditor",
+				title: "0vault",
 				message: "Данные пусты, сохранение отменено.",
 			});
 			return;
@@ -389,7 +389,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (!dirty) {
 			await api.showMessageBoxReq({
 				type: "info",
-				title: "VaultEditor",
+				title: "0vault",
 				message: "Изменений нет. Файл контейнера не перезаписывался.",
 			});
 			return;
@@ -414,7 +414,7 @@ export class VaultEditorProvider implements IVaultEditorProvider {
 		if (plain.length === 0) {
 			await api.showMessageBoxReq({
 				type: "warning",
-				title: "VaultEditor",
+				title: "0vault",
 				message: "Данные пусты, сохранение отменено.",
 			});
 			return;

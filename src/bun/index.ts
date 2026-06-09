@@ -184,7 +184,7 @@ const rpc = BrowserView.defineRPC<VaultAppRPC>({
 const url = await getMainViewUrl();
 
 const mainWindow = new BrowserWindow({
-	title: "VaultEditor",
+	title: "0vault",
 	url,
 	rpc,
 	frame: {

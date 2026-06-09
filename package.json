@@ -1,14 +1,15 @@
 {
-	"name": "under0vault",
+	"name": "0vault",
 	"version": "1.0.0",
-	"description": "Electrobun app with React, Tailwind CSS, and Vite HMR",
+	"description": "Encrypted .age vault editor with archive support — store passwords and secrets safely anywhere",
 	"scripts": {
 		"test": "bun test src/vault src/bun/vaultAge.test.ts",
 		"start": "vite build && electrobun dev",
 		"dev": "electrobun dev --watch",
 		"dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
 		"hmr": "vite --port 5173",
-		"build:canary": "vite build && electrobun build --env=canary"
+		"build:canary": "vite build && electrobun build --env=canary",
+		"build:stable": "electrobun build --env=stable"
 	},
 	"dependencies": {
 		"age-encryption": "^0.3.0",

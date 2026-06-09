@@ -1,6 +1,14 @@
-# React + Tailwind + Vite Electrobun Template
+# 0vault
 
-A fast Electrobun desktop app template with React, Tailwind CSS, and Vite for hot module replacement (HMR).
+A desktop editor for encrypted vault containers. Store passwords, secrets, notes, and any text files in one or more `.age` files — keep them anywhere safely: in the cloud, on a USB drive, in email, or in a git repo. Without the passphrase, the contents are unreadable.
+
+## Features
+
+- **[age](https://age-encryption.org/) encryption** — `.age` containers are protected with a passphrase (scrypt).
+- **Archives** — multiple files and folders inside a single container (packed as ZIP on save).
+- **Editor** — file tree, text editor, unsaved-change tracking.
+- **Formats** — open `.age`, `.zip`, and plain files; export a single file as a ZIP-based `.age` container.
+- **Compatibility** — container format is compatible with the Java `VaultArchive` implementation.
 
 ## Getting Started
 
@@ -8,54 +16,79 @@ A fast Electrobun desktop app template with React, Tailwind CSS, and Vite for ho
 # Install dependencies
 bun install
 
-# Development without HMR (uses bundled assets)
+# Development (build + Electrobun)
 bun run dev
 
 # Development with HMR (recommended)
 bun run dev:hmr
 
-# Build for production
-bun run build
+# Canary build
+bun run build:canary
 
-# Build for production release
-bun run build:prod
+# Stable build
+bun run build:stable
+
+# Tests
+bun test
 ```
 
-## How HMR Works
+Open a file on launch:
 
-When you run `bun run dev:hmr`:
+```bash
+bun run dev -- /path/to/secrets.age
+```
 
-1. **Vite dev server** starts on `http://localhost:5173` with HMR enabled
-2. **Electrobun** starts and detects the running Vite server
-3. The app loads from the Vite dev server instead of bundled assets
-4. Changes to React components update instantly without full page reload
+## Usage
 
-When you run `bun run dev` (without HMR):
+1. Click **Open…** or pass a file path as a command-line argument.
+2. For `.age` files, enter the passphrase. An empty `.age` file creates a new empty container.
+3. Edit files in the tree on the right: create, rename, delete, or add files from disk.
+4. **Save** (`Ctrl+S` / `Cmd+S`) — overwrite the current container (passphrase required).
+5. **Save As…** (`Ctrl+Shift+S` / `Cmd+Shift+S`) — write a new `.age` with a chosen passphrase.
 
-1. Electrobun starts and loads from `views://mainview/index.html`
-2. You need to rebuild (`bun run build`) to see changes
+### Keyboard Shortcuts
+
+| Action | Keys |
+|--------|------|
+| Save | `Ctrl+S` / `Cmd+S` |
+| Save As | `Ctrl+Shift+S` / `Cmd+Shift+S` |
+| Rename | `F2` |
+| Delete file | `Delete` |
+
+### Supported Open Scenarios
+
+| File | Behavior |
+|------|----------|
+| `.age` | Decrypt with passphrase; empty file creates a new container |
+| `.zip` | Import as archive; save is suggested to a sibling `.age` |
+| Any other | Single file in a container; save to `name.age` alongside |
+
+## Stack
+
+- [Electrobun](https://electrobun.dev/) + Bun — native window and file I/O
+- React, Tailwind CSS, Vite (HMR)
+- `age-encryption` — encryption
+- `fflate` — ZIP inside the container
+- Inversify — DI, Valtio — UI state
 
 ## Project Structure
 
 ```
 ├── src/
 │   ├── bun/
-│   │   └── index.ts        # Main process (Electrobun/Bun)
-│   └── mainview/
-│       ├── App.tsx         # React app component
-│       ├── main.tsx        # React entry point
-│       ├── index.html      # HTML template
-│       └── index.css       # Tailwind CSS
-├── electrobun.config.ts    # Electrobun configuration
-├── vite.config.ts          # Vite configuration
-├── tailwind.config.js      # Tailwind configuration
+│   │   ├── index.ts          # Main process: RPC, dialogs, age
+│   │   └── vaultAge.ts       # Encrypt / decrypt
+│   ├── mainview/             # React UI
+│   ├── vault/                # VaultArchive, tree, dirty-tracking
+│   ├── di/                   # VaultEditorProvider
+│   └── rpc/                  # Webview ↔ Bun RPC schema
+├── electrobun.config.ts
+├── vite.config.ts
 └── package.json
 ```
 
-## Customizing
+## Security
 
-- **React components**: Edit files in `src/mainview/`
-- **Tailwind theme**: Edit `tailwind.config.js`
-- **Vite settings**: Edit `vite.config.ts`
-- **Window settings**: Edit `src/bun/index.ts`
-- **App metadata**: Edit `electrobun.config.ts`
+- The passphrase is never written to disk; decryption happens in memory on open and save.
+- `.age` writes are atomic: a temp file in the same directory, then replace the target.
+- Use a long, unique passphrase for strong protection; `.age` files can be copied and synced without exposing their contents.
