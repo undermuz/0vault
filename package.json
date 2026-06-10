@@ -10,7 +10,7 @@
     "dev:web": "nx dev web-pwa",
     "build:web": "nx build web-pwa",
     "build:web:pages": "GH_PAGES=true nx build web-pwa",
-    "deploy:web": "bun run build:web:pages && gh-pages -d dist/apps/web-pwa -r gh --nojekyll",
+    "deploy:web": "bun run build:web:pages && gh-pages -d dist/apps/web-pwa --nojekyll",
     "build:canary": "nx run electrobun-desktop:eb-build-canary",
     "build:stable": "nx run electrobun-desktop:eb-build-stable"
   },
