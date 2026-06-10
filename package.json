@@ -1,6 +1,7 @@
 {
   "name": "0vault",
   "version": "1.1.0",
+  "homepage": "https://undermuz.github.io/0vault",
   "description": "Encrypted .age vault editor with archive support — store passwords and secrets safely anywhere",
   "scripts": {
     "test": "nx run electrobun-desktop:eb-test",
@@ -8,6 +9,8 @@
     "dev:hmr": "nx run electrobun-desktop:eb-dev-hmr",
     "dev:web": "nx dev web-pwa",
     "build:web": "nx build web-pwa",
+    "build:web:pages": "GH_PAGES=true nx build web-pwa",
+    "deploy:web": "bun run build:web:pages && gh-pages -d dist/apps/web-pwa -r gh --nojekyll",
     "build:canary": "nx run electrobun-desktop:eb-build-canary",
     "build:stable": "nx run electrobun-desktop:eb-build-stable"
   },
@@ -55,6 +58,7 @@
     "eslint-plugin-jsx-a11y": "6.10.1",
     "eslint-plugin-react": "7.35.0",
     "eslint-plugin-react-hooks": "5.0.0",
+    "gh-pages": "^6.3.0",
     "jiti": "2.4.2",
     "jsdom": "~22.1.0",
     "jsonc-eslint-parser": "^2.1.0",
